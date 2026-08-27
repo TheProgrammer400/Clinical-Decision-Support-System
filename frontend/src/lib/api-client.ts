@@ -1,0 +1,157 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+
+let accessTokenMemory: string | null = null;
+
+export const setAccessToken = (token: string | null) => {
+  accessTokenMemory = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('cdss_access_token', token);
+    } else {
+      localStorage.removeItem('cdss_access_token');
+    }
+  }
+};
+
+export const getAccessToken = (): string | null => {
+  if (accessTokenMemory) return accessTokenMemory;
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('cdss_access_token');
+  }
+  return null;
+};
+
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getAccessToken();
+  const headers = new Headers(options.headers || {});
+  
+  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+  
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  options.credentials = 'include';
+  options.headers = headers;
+
+  let response = await fetch(`${API_BASE_URL}${url}`, options);
+
+  if (response.status === 401 && !url.includes('/auth/login') && !url.includes('/auth/refresh')) {
+    // Attempt automatic refresh
+    try {
+      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setAccessToken(refreshData.accessToken);
+        
+        // Retry original request with new token
+        headers.set('Authorization', `Bearer ${refreshData.accessToken}`);
+        response = await fetch(`${API_BASE_URL}${url}`, options);
+      } else {
+        setAccessToken(null);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+    } catch (e) {
+      setAccessToken(null);
+    }
+  }
+
+  return response;
+}
+
+export const apiClient = {
+  async register(data: any) {
+    const res = await fetchWithAuth('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await res.json();
+    const json = await res.json();
+    if (json.accessToken) setAccessToken(json.accessToken);
+    return json;
+  },
+
+  async login(credentials: any) {
+    const res = await fetchWithAuth('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    if (!res.ok) throw await res.json();
+    const json = await res.json();
+    if (json.accessToken) setAccessToken(json.accessToken);
+    return json;
+  },
+
+  async logout() {
+    try {
+      await fetchWithAuth('/auth/logout', { method: 'POST' });
+    } finally {
+      setAccessToken(null);
+    }
+  },
+
+  async getProfile() {
+    const res = await fetchWithAuth('/users/me');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async createCase(caseText: string, patientContext?: any, idempotencyKey?: string) {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['idempotency-key'] = idempotencyKey;
+    }
+
+    const res = await fetchWithAuth('/clinical-cases', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ caseText, patientContext }),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getCase(id: string) {
+    const res = await fetchWithAuth(`/clinical-cases/${id}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async listCases(page = 1, limit = 20) {
+    const res = await fetchWithAuth(`/clinical-cases?page=${page}&limit=${limit}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async analyzeCase(id: string) {
+    const res = await fetchWithAuth(`/clinical-cases/${id}/analyze`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async submitFeedback(analysisId: string, rating: string, comment?: string) {
+    const res = await fetchWithAuth(`/clinical-analysis/${analysisId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, comment }),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getAuditLogs(page = 1, limit = 50) {
+    const res = await fetchWithAuth(`/admin/audit-logs?page=${page}&limit=${limit}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+};

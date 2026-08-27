@@ -1,0 +1,133 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  DOCTOR
+  ORG_ADMIN
+  SUPER_ADMIN
+}
+
+enum CaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum AnalysisStatus {
+  SUCCESS
+  VALIDATION_FAILED
+  GROQ_ERROR
+}
+
+enum FeedbackRating {
+  HELPFUL
+  PARTIALLY_HELPFUL
+  NOT_HELPFUL
+}
+
+model Organization {
+  id            String         @id @default(uuid())
+  name          String
+  createdAt     DateTime       @default(now()) @map("created_at")
+  users         User[]
+  clinicalCases ClinicalCase[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  organizationId String?         @map("organization_id")
+  email          String          @unique
+  passwordHash   String          @map("password_hash")
+  role           Role            @default(DOCTOR)
+  fullName       String          @map("full_name")
+  mfaEnabled     Boolean         @default(false) @map("mfa_enabled")
+  refreshTokenVersion Int        @default(1) @map("refresh_token_version")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  lastLoginAt    DateTime?       @map("last_login_at")
+
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  clinicalCases  ClinicalCase[]
+  doctorFeedback DoctorFeedback[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model ClinicalCase {
+  id             String             @id @default(uuid())
+  doctorId       String             @map("doctor_id")
+  organizationId String?            @map("organization_id")
+  idempotencyKey String?            @unique @map("idempotency_key")
+  caseText       String             @map("case_text") @db.Text
+  patientContext Json?              @map("patient_context")
+  status         CaseStatus         @default(PENDING)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  doctor         User               @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  analyses       ClinicalAnalysis[]
+
+  @@index([doctorId, createdAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("clinical_cases")
+}
+
+model ClinicalAnalysis {
+  id             String            @id @default(uuid())
+  clinicalCaseId String            @map("clinical_case_id")
+  modelName      String            @map("model_name")
+  promptVersion  String            @map("prompt_version")
+  responseJson   Json?             @map("response_json")
+  rawTokenUsage  Json?             @map("raw_token_usage")
+  latencyMs      Int?              @map("latency_ms")
+  status         AnalysisStatus    @default(SUCCESS)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  clinicalCase   ClinicalCase      @relation(fields: [clinicalCaseId], references: [id], onDelete: Cascade)
+  feedbacks      DoctorFeedback[]
+
+  @@index([clinicalCaseId])
+  @@map("clinical_analyses")
+}
+
+model DoctorFeedback {
+  id                 String           @id @default(uuid())
+  clinicalAnalysisId String           @map("clinical_analysis_id")
+  doctorId           String           @map("doctor_id")
+  rating             FeedbackRating
+  comment            String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  clinicalAnalysis   ClinicalAnalysis @relation(fields: [clinicalAnalysisId], references: [id], onDelete: Cascade)
+  doctor             User             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalAnalysisId])
+  @@map("doctor_feedbacks")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?  @map("actor_user_id")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  metadata     Json?
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actorUser    User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
