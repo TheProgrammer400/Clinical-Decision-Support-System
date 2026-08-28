@@ -162,6 +162,45 @@ export const apiClient = {
     return res.json();
   },
 
+  async getAdminDashboardStats() {
+    const res = await fetchWithAuth('/admin/dashboard-stats');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getAdminDoctors() {
+    const res = await fetchWithAuth('/admin/doctors');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async updateDoctorStatus(doctorId: string, status: 'Active' | 'Suspended') {
+    const res = await fetchWithAuth(`/admin/doctors/${doctorId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getAdminQueries(page = 1, limit = 20) {
+    const res = await fetchWithAuth(`/admin/queries?page=${page}&limit=${limit}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getAdminAiModels() {
+    const res = await fetchWithAuth('/admin/ai-models');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getAdminSystemHealth() {
+    const res = await fetchWithAuth('/admin/system-health');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
   async uploadMri(caseId: string, files: File[]) {
     const formData = new FormData();
     for (const file of files) {

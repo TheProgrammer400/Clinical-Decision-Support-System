@@ -12,6 +12,7 @@ import { SafetyModule } from './modules/safety/safety.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { MriModule } from './modules/mri/mri.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { AuditController } from './modules/audit/audit.controller';
 
 @Module({
@@ -29,6 +30,7 @@ import { AuditController } from './modules/audit/audit.controller';
     SafetyModule,
     HealthModule,
     MriModule,
+    AdminModule,
   ],
   controllers: [AuditController],
 })

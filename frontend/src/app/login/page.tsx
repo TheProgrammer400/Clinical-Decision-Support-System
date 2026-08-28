@@ -19,8 +19,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await apiClient.login({ email, password });
-      router.push('/cases');
+      const loginRes = await apiClient.login({ email, password });
+      if (loginRes.user?.role === 'ORG_ADMIN' || loginRes.user?.role === 'SUPER_ADMIN') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

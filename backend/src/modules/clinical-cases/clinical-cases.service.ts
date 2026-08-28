@@ -112,7 +112,10 @@ export class ClinicalCasesService {
           analyses: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { id: true, status: true, createdAt: true, modelName: true },
+            select: { id: true, status: true, createdAt: true, modelName: true, responseJson: true },
+          },
+          mriAnalyses: {
+            select: { id: true, status: true, originalFilename: true, findings: true, createdAt: true },
           },
         },
       }),
