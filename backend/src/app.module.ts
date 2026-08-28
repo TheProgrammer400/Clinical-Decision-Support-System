@@ -11,6 +11,7 @@ import { PromptsModule } from './modules/prompts/prompts.module';
 import { SafetyModule } from './modules/safety/safety.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
+import { MriModule } from './modules/mri/mri.module';
 import { AuditController } from './modules/audit/audit.controller';
 
 @Module({
@@ -27,6 +28,7 @@ import { AuditController } from './modules/audit/audit.controller';
     PromptsModule,
     SafetyModule,
     HealthModule,
+    MriModule,
   ],
   controllers: [AuditController],
 })

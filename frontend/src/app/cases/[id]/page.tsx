@@ -16,8 +16,12 @@ import {
   ThumbsDown,
   Clock,
   ShieldCheck,
+  Image as ImageIcon,
+  Cpu,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getArtifactUrl } from '@/lib/api-client';
 
 export default function CaseDetailPage() {
   const params = useParams();
@@ -25,6 +29,7 @@ export default function CaseDetailPage() {
   const caseId = params.id as string;
 
   const [clinicalCase, setClinicalCase] = useState<any>(null);
+  const [mriAnalyses, setMriAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,8 +42,12 @@ export default function CaseDetailPage() {
   const fetchCaseDetails = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getCase(caseId);
-      setClinicalCase(data);
+      const [caseData, mriData] = await Promise.all([
+        apiClient.getCase(caseId),
+        apiClient.getCaseMriAnalyses(caseId).catch(() => []),
+      ]);
+      setClinicalCase(caseData);
+      setMriAnalyses(mriData || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load case details');
     } finally {
@@ -164,6 +173,172 @@ export default function CaseDetailPage() {
           {clinicalCase.caseText}
         </p>
       </div>
+
+      {/* BRAIN MRI SEGMENTATION & VISUALIZATIONS SECTION */}
+      {mriAnalyses && mriAnalyses.length > 0 && (
+        <div className="glass-panel p-6 rounded-2xl border border-purple-500/30 space-y-6 bg-purple-950/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/20 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
+                <Cpu className="h-6 w-6 text-purple-400" />
+                <span>Brain MRI Quantitative Segmentation & Visualizations</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+                  U-Net GPU
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Automated PyTorch ResNet50-UNet image-derived quantitative findings & 3-panel visualization artifacts.
+              </p>
+            </div>
+            <div className="text-xs text-purple-300 font-mono bg-purple-900/40 px-3 py-1.5 rounded-xl border border-purple-500/30 self-start">
+              Model Version: {mriAnalyses[0]?.modelVersion || 'unet_v1.2.0'}
+            </div>
+          </div>
+
+          {/* MRI Imaging Non-Diagnostic Banner */}
+          <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl text-xs text-purple-200 italic flex items-center space-x-2">
+            <Sparkles className="h-4 w-4 text-purple-400 flex-shrink-0" />
+            <span>
+              Automated image segmentation output — NOT a diagnosis, NOT a determination of tumor type, and NOT a grading assessment. Reviewed findings must be clinically correlated.
+            </span>
+          </div>
+
+          {/* Iterate over MRI Analysis Records */}
+          <div className="space-y-8">
+            {mriAnalyses.map((mri: any, idx: number) => (
+              <div
+                key={mri.id}
+                className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <ImageIcon className="h-4 w-4 text-purple-400" />
+                    <span className="text-sm font-semibold text-slate-200">
+                      Scan #{idx + 1}: {mri.originalFilename}
+                    </span>
+                    <span className="text-xs text-slate-500 font-mono">({mri.id.slice(0, 8)})</span>
+                  </div>
+                  <span
+                    className={`text-xs px-2.5 py-0.5 rounded font-bold uppercase ${
+                      mri.status === 'COMPLETED'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                        : mri.status === 'FAILED'
+                        ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {mri.status}
+                  </span>
+                </div>
+
+                {mri.status === 'FAILED' ? (
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+                    <span className="font-semibold">Segmentation Failed: </span>
+                    {mri.errorMessage || 'Image processing error'}
+                  </div>
+                ) : (
+                  <>
+                    {/* 3-Panel Visualization Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                      {/* 1. Original MRI */}
+                      <div className="space-y-2 text-center">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-center space-x-1">
+                          <Layers className="h-3.5 w-3.5 text-sky-400" />
+                          <span>1. Input Brain MRI</span>
+                        </div>
+                        <div className="aspect-square bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center">
+                          {mri.urls?.original ? (
+                            <img
+                              src={getArtifactUrl(mri.urls.original)}
+                              alt="Original MRI"
+                              className="w-full h-full object-contain hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-600">No preview</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 2. Segmented Mask */}
+                      <div className="space-y-2 text-center">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-center space-x-1">
+                          <Layers className="h-3.5 w-3.5 text-purple-400" />
+                          <span>2. Segmented Mask</span>
+                        </div>
+                        <div className="aspect-square bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center">
+                          {mri.urls?.mask ? (
+                            <img
+                              src={getArtifactUrl(mri.urls.mask)}
+                              alt="Segmented Mask"
+                              className="w-full h-full object-contain hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-600">Mask pending</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Tumor Overlay */}
+                      <div className="space-y-2 text-center">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-center space-x-1">
+                          <Layers className="h-3.5 w-3.5 text-red-400" />
+                          <span>3. Tumor Overlay</span>
+                        </div>
+                        <div className="aspect-square bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center">
+                          {mri.urls?.overlay ? (
+                            <img
+                              src={getArtifactUrl(mri.urls.overlay)}
+                              alt="Tumor Overlay"
+                              className="w-full h-full object-contain hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-600">Overlay pending</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quantitative Findings Stats Table */}
+                    {mri.findings && (
+                      <div className="pt-3 border-t border-slate-800">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                          Quantitative Segmentation Metrics
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                            <div className="text-slate-500 text-[10px] uppercase">Tumor Pixels</div>
+                            <div className="text-sm font-bold text-red-400 mt-0.5">
+                              {mri.findings.tumor_pixels} px
+                            </div>
+                          </div>
+                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                            <div className="text-slate-500 text-[10px] uppercase">Brain Pixels</div>
+                            <div className="text-sm font-bold text-sky-400 mt-0.5">
+                              {mri.findings.brain_pixels} px
+                            </div>
+                          </div>
+                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                            <div className="text-slate-500 text-[10px] uppercase">Tumor Area %</div>
+                            <div className="text-sm font-bold text-purple-400 mt-0.5">
+                              {mri.findings.area_percent}%
+                            </div>
+                          </div>
+                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                            <div className="text-slate-500 text-[10px] uppercase">Width Span %</div>
+                            <div className="text-sm font-bold text-amber-400 mt-0.5">
+                              ~{mri.findings.visual_width_span_percent}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* RED FLAGS ALERT SECTION */}
       {analysisResult.red_flags && analysisResult.red_flags.length > 0 && (

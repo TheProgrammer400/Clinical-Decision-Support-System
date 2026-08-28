@@ -6,13 +6,19 @@
 .env.production.local
 backend/.env
 frontend/.env.local
+mri-inference-service/.env
 *.env
 !*.env.example
 
-# Dependency directories
+# Dependency directories & Virtual Environments
 node_modules/
 backend/node_modules/
 frontend/node_modules/
+venv/
+.venv/
+env/
+mri-inference-service/venv/
+mri-inference-service/.venv/
 
 # Node.js logs & diagnostics
 npm-debug.log*
@@ -21,6 +27,34 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 *.log
+
+# Python Caches & Build Outputs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+
+# Large Model Checkpoints & Weights
+*.pth
+*.pt
+*.bin
+*.onnx
+mri-inference-service/models/*.pth
+!mri-inference-service/models/.gitkeep
+
+# Local Uploads & Storage Artifacts
+uploads/
+backend/uploads/
+*.png
+*.jpg
+*.jpeg
+*.webp
+!frontend/public/**/*
 
 # Backend Build & Test Outputs
 backend/dist/
@@ -67,10 +101,12 @@ tmp/
 temp/
 scratch/
 
-# everything except READMD.md file
 *.md
 !README.md
 
 # Ignore AWS Infrastructure & GitHub CI/CD workflows
 .github/
 infrastructure/
+
+# unneccessary files
+additional/

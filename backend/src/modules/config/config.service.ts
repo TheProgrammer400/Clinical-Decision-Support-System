@@ -46,7 +46,7 @@ export class AppConfigService {
   }
 
   get promptVersion(): string {
-    return this.nestConfigService.get<string>('PROMPT_VERSION', 'v1.3.0');
+    return this.nestConfigService.get<string>('PROMPT_VERSION', 'v1.4.0');
   }
 
   get logLevel(): string {
@@ -55,5 +55,21 @@ export class AppConfigService {
 
   get sentryDsn(): string {
     return this.nestConfigService.get<string>('SENTRY_DSN', '');
+  }
+
+  get mriInferenceServiceUrl(): string {
+    return this.nestConfigService.get<string>('MRI_INFERENCE_SERVICE_URL', 'http://localhost:8000');
+  }
+
+  get mriMaxUploadSizeMb(): number {
+    return Number(this.nestConfigService.get<number>('MRI_MAX_UPLOAD_SIZE_MB', 20));
+  }
+
+  get mriS3Bucket(): string {
+    return this.nestConfigService.get<string>('MRI_S3_BUCKET', 'cdss-mri-artifacts');
+  }
+
+  get modelArtifactsS3Bucket(): string {
+    return this.nestConfigService.get<string>('MODEL_ARTIFACTS_S3_BUCKET', 'cdss-model-artifacts');
   }
 }

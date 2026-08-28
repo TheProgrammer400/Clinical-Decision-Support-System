@@ -28,9 +28,22 @@ export class ClinicalAnalysisService {
       throw new NotFoundException('Clinical case not found');
     }
 
+    const mriRecords = await this.prisma.mriAnalysis.findMany({
+      where: { clinicalCaseId: caseId, status: 'COMPLETED' },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const mriFindings = mriRecords
+      .filter((r) => r.findings !== null)
+      .map((r) => ({
+        filename: r.originalFilename,
+        findings: r.findings as any,
+      }));
+
     const promptPackage = this.promptsService.buildClinicalPrompt(
       clinicalCase.caseText,
       clinicalCase.patientContext as Record<string, any>,
+      mriFindings,
     );
 
     let rawResponse;

@@ -76,10 +76,40 @@ model ClinicalCase {
   doctor         User               @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   analyses       ClinicalAnalysis[]
+  mriAnalyses    MriAnalysis[]
 
   @@index([doctorId, createdAt(sort: Desc)])
   @@index([organizationId])
   @@map("clinical_cases")
+}
+
+enum MriStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model MriAnalysis {
+  id               String       @id @default(uuid())
+  clinicalCaseId   String       @map("clinical_case_id")
+  originalFilename String       @map("original_filename")
+  originalImageKey String       @map("original_image_key")
+  maskImageKey     String?      @map("mask_image_key")
+  overlayImageKey  String?      @map("overlay_image_key")
+  findings         Json?        @map("findings")
+  modelVersion     String       @default("unet_v1.2.0") @map("model_version")
+  status           MriStatus    @default(PROCESSING)
+  errorMessage     String?      @map("error_message")
+  processingTimeMs Int?         @map("processing_time_ms")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  clinicalCase     ClinicalCase @relation(fields: [clinicalCaseId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalCaseId])
+  @@index([status])
+  @@map("mri_analyses")
 }
 
 model ClinicalAnalysis {
