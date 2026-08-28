@@ -27,10 +27,10 @@ describe('PromptsService', () => {
     expect(pkg.userPrompt).toContain('<<<CLINICAL_CASE_TEXT>>>');
     expect(pkg.userPrompt).toContain('Patient with chest pain radiating to left arm');
     expect(pkg.userPrompt).toContain('<<<END_CLINICAL_CASE_TEXT>>>');
-    expect(pkg.userPrompt).not.toContain('<<<MRI_SEGMENTATION_FINDINGS>>>');
+    expect(pkg.userPrompt).not.toContain('IMAGE-DERIVED U-NET FINDINGS:');
   });
 
-  it('should append MRI segmentation findings block when mriFindings is provided', () => {
+  it('should append structured U-Net JSON findings and integration instructions when mriFindings is provided', () => {
     const mriFindings: MriFindingForPrompt[] = [
       {
         filename: 'brain_scan1.png',
@@ -49,11 +49,11 @@ describe('PromptsService', () => {
       mriFindings,
     );
 
-    expect(pkg.userPrompt).toContain('<<<MRI_SEGMENTATION_FINDINGS>>>');
-    expect(pkg.userPrompt).toContain('Image 1 (brain_scan1.png):');
-    expect(pkg.userPrompt).toContain('Tumor-region pixels: 405');
-    expect(pkg.userPrompt).toContain('Tumor area: 5.30% of visible brain tissue');
-    expect(pkg.userPrompt).toContain('<<<END_MRI_SEGMENTATION_FINDINGS>>>');
+    expect(pkg.userPrompt).toContain('IMAGE-DERIVED U-NET FINDINGS:');
+    expect(pkg.userPrompt).toContain('"brain_scan1.png"');
+    expect(pkg.userPrompt).toContain('"tumor_pixels": 405');
+    expect(pkg.userPrompt).toContain('"area_percent": 5.3');
+    expect(pkg.userPrompt).toContain('U-NET INTEGRATION INSTRUCTIONS:');
   });
 
   it('should throw BadRequestException if case text is empty', () => {
