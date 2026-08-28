@@ -21,6 +21,13 @@ export const getAccessToken = (): string | null => {
   return null;
 };
 
+export const getArtifactUrl = (url: string | null | undefined): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const baseUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return `${baseUrl}${url}`;
+};
+
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const token = getAccessToken();
   const headers = new Headers(options.headers || {});
@@ -151,6 +158,25 @@ export const apiClient = {
 
   async getAuditLogs(page = 1, limit = 50) {
     const res = await fetchWithAuth(`/admin/audit-logs?page=${page}&limit=${limit}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async uploadMri(caseId: string, files: File[]) {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    const res = await fetchWithAuth(`/clinical-cases/${caseId}/mri`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getCaseMriAnalyses(caseId: string) {
+    const res = await fetchWithAuth(`/clinical-cases/${caseId}/mri`);
     if (!res.ok) throw await res.json();
     return res.json();
   },

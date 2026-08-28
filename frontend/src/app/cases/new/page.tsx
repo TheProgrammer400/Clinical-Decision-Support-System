@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Sparkles, AlertCircle, FileText, UserCheck, Stethoscope } from 'lucide-react';
+import { Activity, Sparkles, AlertCircle, FileText, UserCheck, Stethoscope, Image as ImageIcon, Upload, X } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
 export default function NewCasePage() {
@@ -10,9 +10,36 @@ export default function NewCasePage() {
   const [caseText, setCaseText] = useState('');
   const [ageGroup, setAgeGroup] = useState('51-65');
   const [sex, setSex] = useState('Male');
+  const [mriFiles, setMriFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [streamingStep, setStreamingStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      const validFiles: File[] = [];
+
+      for (const file of selectedFiles) {
+        if (file.size > 20 * 1024 * 1024) {
+          setError(`File '${file.name}' exceeds 20MB maximum limit.`);
+          return;
+        }
+        if (!file.type.startsWith('image/')) {
+          setError(`File '${file.name}' is not a valid image format.`);
+          return;
+        }
+        validFiles.push(file);
+      }
+
+      setError(null);
+      setMriFiles((prev) => [...prev, ...validFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setMriFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,21 +50,33 @@ export default function NewCasePage() {
 
     setError(null);
     setLoading(true);
-    setStreamingStep('Creating clinical case entry...');
 
     try {
       const idempotencyKey = `case_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const patientContext = { ageGroup, sex };
 
-      // 1. Create Case
+      // 1. Create Case Entry
+      setStreamingStep('Creating clinical case record...');
       const newCase = await apiClient.createCase(caseText, patientContext, idempotencyKey);
-      setStreamingStep('Invoking Groq LLM clinical reasoning engine...');
 
-      // 2. Trigger Analysis
+      // 2. Upload and Run U-Net Segmentation if MRI images attached
+      if (mriFiles.length > 0) {
+        setStreamingStep(`Running U-Net brain MRI segmentation on GPU (${mriFiles.length} file${mriFiles.length > 1 ? 's' : ''})...`);
+        try {
+          await apiClient.uploadMri(newCase.id, mriFiles);
+        } catch (mriErr: any) {
+          console.error('MRI Segmentation warning:', mriErr);
+          setError(`MRI segmentation warning: ${mriErr.message || 'Image processing failed'}. Proceeding with text analysis.`);
+        }
+      }
+
+      // 3. Trigger Groq LLM Clinical Reasoning Engine
+      setStreamingStep('Invoking Groq LLM clinical reasoning engine...');
       await apiClient.analyzeCase(newCase.id);
+
       setStreamingStep('Finalizing schema validation and safety checks...');
 
-      // 3. Redirect to Detail Page
+      // 4. Redirect to Case Detail Dashboard
       router.push(`/cases/${newCase.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to complete clinical evaluation request. Please retry.');
@@ -64,7 +103,7 @@ export default function NewCasePage() {
             <span>New Clinical Case Evaluation</span>
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Submit a natural-language clinical narrative for Groq LLM probabilistic differential diagnostic analysis.
+            Submit a clinical narrative and optional Brain MRI scans for AI decision support & U-Net segmentation.
           </p>
         </div>
         <button
@@ -119,9 +158,72 @@ export default function NewCasePage() {
               </select>
             </div>
           </div>
-          <p className="text-xs text-slate-500 italic">
-            Note: Do NOT input patient names, MRNs, or formal patient identifiers. All cases are processed under PHI data minimization guidelines.
-          </p>
+        </div>
+
+        {/* Brain MRI File Upload Card */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+              <ImageIcon className="h-4 w-4 text-purple-400" />
+              <span>Attach Brain MRI Scans (Optional U-Net Segmentation)</span>
+            </h2>
+            <span className="text-xs text-slate-500">GPU PyTorch U-Net Model</span>
+          </div>
+
+          <div className="border-2 border-dashed border-slate-800 rounded-xl p-6 text-center hover:border-purple-500/40 transition-colors">
+            <input
+              type="file"
+              id="mri-upload"
+              multiple
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <label
+              htmlFor="mri-upload"
+              className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+            >
+              <div className="p-3 bg-purple-500/10 rounded-full text-purple-400 border border-purple-500/20">
+                <Upload className="h-6 w-6" />
+              </div>
+              <div className="text-sm font-medium text-slate-200">
+                Click to attach brain MRI scan images (PNG, JPG, WEBP)
+              </div>
+              <div className="text-xs text-slate-500">
+                Max 20MB per image. Quantitative tumor segmentation executed on GPU.
+              </div>
+            </label>
+          </div>
+
+          {/* Uploaded File Badges */}
+          {mriFiles.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Attached MRI Scans ({mriFiles.length})
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {mriFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-slate-900 border border-purple-500/30 rounded-xl text-xs text-purple-300 font-mono"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 text-purple-400" />
+                    <span>{file.name}</span>
+                    <span className="text-slate-500 text-[10px]">
+                      ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Clinical Narrative Input */}
