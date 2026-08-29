@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   FileText,
   Activity,
@@ -340,23 +341,93 @@ export default function CaseDetailPage() {
         </div>
       )}
 
-      {/* RED FLAGS ALERT SECTION */}
-      {analysisResult.red_flags && analysisResult.red_flags.length > 0 && (
-        <div className="p-5 bg-red-950/40 border border-red-500/40 rounded-2xl space-y-3 shadow-lg shadow-red-950/50">
-          <div className="flex items-center space-x-2 text-red-400 font-bold text-base">
-            <AlertTriangle className="h-6 w-6 text-red-400 animate-pulse" />
-            <span>URGENT RED FLAGS — URGENT EMERGENCY RULE-OUTS</span>
+      {/* CLINICAL ALERT SECTION (CONDITIONAL SEVERITY: CRITICAL, MODERATE, LOW) */}
+      {(() => {
+        const alertData = analysisResult.alert;
+        const redFlags = analysisResult.red_flags || [];
+
+        let severity = alertData?.severity;
+        if (!severity || !['critical', 'moderate', 'low'].includes(severity)) {
+          severity = redFlags.length > 0 ? 'moderate' : 'low';
+        }
+
+        const items = alertData?.items && alertData.items.length > 0 ? alertData.items : redFlags;
+        const title =
+          alertData?.title ||
+          (severity === 'critical'
+            ? 'CRITICAL — URGENT EMERGENCY RULE-OUTS'
+            : severity === 'moderate'
+            ? 'MODERATE — CLINICAL CONCERNS TO MONITOR'
+            : 'LOW — NO IMMEDIATE RED FLAGS IDENTIFIED');
+        const summary = alertData?.summary;
+
+        if (severity === 'critical') {
+          return (
+            <div className="p-5 bg-red-950/40 border border-red-500/40 rounded-2xl space-y-3 shadow-lg shadow-red-950/50">
+              <div className="flex items-center space-x-2 text-red-400 font-bold text-base">
+                <AlertTriangle className="h-6 w-6 text-red-400 animate-pulse" />
+                <span>{title}</span>
+              </div>
+              {summary && <p className="text-xs text-red-300/90 italic">{summary}</p>}
+              <ul className="space-y-2 pl-2">
+                {items.map((flag: string, idx: number) => (
+                  <li key={idx} className="flex items-start space-x-2 text-sm text-red-200">
+                    <span className="text-red-500 font-bold">•</span>
+                    <span className="font-semibold">{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+
+        if (severity === 'moderate') {
+          return (
+            <div className="p-5 bg-amber-950/40 border border-amber-500/40 rounded-2xl space-y-3 shadow-lg shadow-amber-950/50">
+              <div className="flex items-center space-x-2 text-amber-400 font-bold text-base">
+                <AlertCircle className="h-6 w-6 text-amber-400" />
+                <span>{title}</span>
+              </div>
+              {summary && <p className="text-xs text-amber-300/90 italic">{summary}</p>}
+              <ul className="space-y-2 pl-2">
+                {items.length > 0 ? (
+                  items.map((flag: string, idx: number) => (
+                    <li key={idx} className="flex items-start space-x-2 text-sm text-amber-200">
+                      <span className="text-amber-400 font-bold">•</span>
+                      <span className="font-medium">{flag}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-amber-200">Clinically important concerns identified that warrant timely evaluation.</li>
+                )}
+              </ul>
+            </div>
+          );
+        }
+
+        // LOW / GREEN
+        return (
+          <div className="p-5 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl space-y-3 shadow-lg shadow-emerald-950/30">
+            <div className="flex items-center space-x-2 text-emerald-400 font-bold text-base">
+              <ShieldCheck className="h-6 w-6 text-emerald-400" />
+              <span>{title}</span>
+            </div>
+            {summary && <p className="text-xs text-emerald-300/90 italic">{summary}</p>}
+            <ul className="space-y-2 pl-2">
+              {items.length > 0 ? (
+                items.map((flag: string, idx: number) => (
+                  <li key={idx} className="flex items-start space-x-2 text-sm text-emerald-200">
+                    <span className="text-emerald-400 font-bold">•</span>
+                    <span>{flag}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-emerald-200">No immediate emergency features identified from the information provided.</li>
+              )}
+            </ul>
           </div>
-          <ul className="space-y-2 pl-2">
-            {analysisResult.red_flags.map((flag: string, idx: number) => (
-              <li key={idx} className="flex items-start space-x-2 text-sm text-red-200">
-                <span className="text-red-500 font-bold">•</span>
-                <span className="font-semibold">{flag}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Case Summary & Key Findings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

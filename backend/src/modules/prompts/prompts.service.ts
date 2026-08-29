@@ -61,7 +61,10 @@ CRITICAL CLINICAL & SAFETY CONSTRAINTS:
 1. DO NOT make definitive or authoritative medical diagnoses. You provide decision support ONLY.
 2. DO NOT prescribe precise drug dosages or treatment regimens.
 3. Express diagnostic likelihood QUALITATIVELY only using exact values: "high", "moderate", or "low". NEVER use numeric percentages.
-4. Always highlight urgent, life-threatening red flag conditions to rule out immediately.
+4. Dynamically assess clinical alert severity based strictly on case urgency:
+   - "critical": ONLY for acute, life-threatening, or time-sensitive emergency conditions requiring immediate rule-out (e.g. ACS, aortic dissection, tension pneumothorax, brain herniation, acute mass effect).
+   - "moderate": For clinically important concerns requiring timely evaluation, but NOT an immediate life-threatening emergency (e.g. subacute symptoms, persistent mass needing workup).
+   - "low": When NO immediate red flags or time-sensitive emergency concerns are present (e.g. chronic joint pain, mild tension headache). DO NOT default routine cases to critical/emergency status.
 5. Identify key missing history, physical exam findings, or lab values.
 6. Explicitly state supporting and contradicting evidence for each differential consideration, incorporating quantitative image-derived U-Net findings whenever provided.
 7. Return your entire analysis as a valid, single JSON object adhering strictly to the requested schema.`;
@@ -125,7 +128,13 @@ You MUST respond strictly with a valid JSON object matching the following struct
       "contradicting_evidence": ["Factors pointing away or absent markers"]
     }
   ],
-  "red_flags": ["Urgent/dangerous emergency conditions warranting immediate rule-out"],
+  "alert": {
+    "severity": "critical | moderate | low",
+    "title": "Header text corresponding to severity (e.g., CRITICAL — URGENT EMERGENCY RULE-OUTS, MODERATE — CLINICAL CONCERNS TO MONITOR, or LOW — NO IMMEDIATE RED FLAGS IDENTIFIED)",
+    "summary": "Short 1-2 sentence overview of alert status",
+    "items": ["List of specific clinical concerns, red flags, or monitoring items"]
+  },
+  "red_flags": ["List of specific urgent clinical concerns or red flags"],
   "recommended_investigations": ["Key diagnostic tests/imaging/labs to consider"],
   "clinical_reasoning": "Synthesis of diagnostic thought process, explicitly discussing U-Net quantitative findings and their clinical context",
   "uncertainty_notes": "Explicit statement of evaluation limitations based on input completeness and U-Net segmentation constraints",

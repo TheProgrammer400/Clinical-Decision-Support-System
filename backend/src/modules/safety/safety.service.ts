@@ -51,6 +51,34 @@ export class SafetyService {
     // Safety Rule 3: Server ALWAYS overwrites the disclaimer field
     validatedData.disclaimer = SERVER_FIXED_DISCLAIMER;
 
+    // Safety Rule 4: Standardize clinical alert object with safe severity fallbacks
+    if (!validatedData.alert || !['critical', 'moderate', 'low'].includes(validatedData.alert.severity)) {
+      const redFlagItems = validatedData.red_flags || [];
+      if (redFlagItems.length > 0) {
+        validatedData.alert = {
+          severity: 'moderate',
+          title: 'MODERATE — CLINICAL CONCERNS TO MONITOR',
+          summary: 'Clinically important concerns identified that warrant timely evaluation.',
+          items: redFlagItems,
+        };
+      } else {
+        validatedData.alert = {
+          severity: 'low',
+          title: 'LOW — NO IMMEDIATE RED FLAGS IDENTIFIED',
+          summary: 'No immediate emergency features identified from the information provided.',
+          items: ['No immediate emergency features identified from the information provided.'],
+        };
+      }
+    } else {
+      // Ensure alert.items and red_flags remain in sync
+      if ((!validatedData.alert.items || validatedData.alert.items.length === 0) && validatedData.red_flags.length > 0) {
+        validatedData.alert.items = [...validatedData.red_flags];
+      }
+      if (validatedData.red_flags.length === 0 && validatedData.alert.items && validatedData.alert.items.length > 0) {
+        validatedData.red_flags = [...validatedData.alert.items];
+      }
+    }
+
     return validatedData;
   }
 }
