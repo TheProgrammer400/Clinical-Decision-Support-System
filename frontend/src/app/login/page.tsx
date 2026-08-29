@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Activity, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
-import { apiClient, getAccessToken } from '@/lib/api-client';
+import { apiClient } from '@/lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,22 +14,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return;
-
-    apiClient
-      .getProfile()
-      .then((user) => {
-        if (user) {
-          if (user.role === 'ORG_ADMIN' || user.role === 'SUPER_ADMIN') {
-            router.push('/admin/dashboard');
-          } else {
-            router.push('/dashboard');
-          }
-        }
-      })
-      .catch(() => null);
-  }, [router]);
+    // Destroy any active session when navigating to the Sign In page
+    apiClient.logout().catch(() => null);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
