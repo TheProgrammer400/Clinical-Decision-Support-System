@@ -63,7 +63,11 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
         response = await fetch(`${API_BASE_URL}${url}`, options);
       } else {
         setAccessToken(null);
-        if (typeof window !== 'undefined') {
+        if (
+          typeof window !== 'undefined' &&
+          window.location.pathname !== '/login' &&
+          window.location.pathname !== '/register'
+        ) {
           window.location.href = '/login';
         }
       }
