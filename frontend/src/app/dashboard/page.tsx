@@ -31,12 +31,13 @@ export default function DoctorDashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      const [profileData, casesResponse] = await Promise.all([
-        apiClient.getProfile().catch(() => null),
-        apiClient.listCases(1, 50).catch(() => ({ data: [], meta: { total: 0 } })),
-      ]);
-
+      const profileData = await apiClient.getProfile().catch(() => null);
+      if (!profileData) {
+        router.push('/login');
+        return;
+      }
       setUser(profileData);
+      const casesResponse = await apiClient.listCases(1, 50).catch(() => ({ data: [], meta: { total: 0 } }));
       setCases(casesResponse.data || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard metrics.');

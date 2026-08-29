@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ShieldAlert,
   Users,
@@ -24,6 +25,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,13 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true);
       setError(null);
+
+      const profile = await apiClient.getProfile().catch(() => null);
+      if (!profile || (profile.role !== 'ORG_ADMIN' && profile.role !== 'SUPER_ADMIN')) {
+        router.push('/login');
+        return;
+      }
+
       const [statsData, doctorsData] = await Promise.all([
         apiClient.getAdminDashboardStats().catch(() => null),
         apiClient.getAdminDoctors().catch(() => []),

@@ -13,6 +13,21 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  React.useEffect(() => {
+    apiClient
+      .getProfile()
+      .then((user) => {
+        if (user) {
+          if (user.role === 'ORG_ADMIN' || user.role === 'SUPER_ADMIN') {
+            router.push('/admin/dashboard');
+          } else {
+            router.push('/dashboard');
+          }
+        }
+      })
+      .catch(() => null);
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
