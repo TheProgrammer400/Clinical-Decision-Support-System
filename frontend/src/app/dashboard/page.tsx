@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Cpu,
   AlertTriangle,
+  AlertCircle,
   ArrowRight,
   RefreshCw,
   Eye,
@@ -58,13 +59,34 @@ export default function DoctorDashboardPage() {
     (c) => c.mriAnalyses && c.mriAnalyses.length > 0,
   ).length;
 
-  // Priority Filter Groups
-  const highRiskCases = cases.filter((c) => {
+  // Priority Filter Groups by Severity & Status
+  const criticalCases = cases.filter((c) => {
+    if (c.status === 'FAILED') return false;
     const analysis = c.analyses?.[0]?.responseJson;
-    return analysis?.red_flags && analysis.red_flags.length > 0;
+    if (!analysis) return false;
+    const alert = analysis.alert;
+    if (alert?.severity === 'critical') return true;
+    if (!alert && analysis.red_flags && analysis.red_flags.length > 0) {
+      const text = JSON.stringify(analysis.red_flags).toLowerCase();
+      if (text.includes('critical') || text.includes('emergency') || text.includes('herniation') || text.includes('infarct') || text.includes('dissection') || text.includes('tamponade') || text.includes('acute')) {
+        return true;
+      }
+    }
+    return false;
   });
 
-  const pendingReviewCases = cases.filter((c) => c.status === 'PENDING');
+  const moderateCases = cases.filter((c) => {
+    if (c.status === 'FAILED') return false;
+    const analysis = c.analyses?.[0]?.responseJson;
+    if (!analysis) return false;
+    const alert = analysis.alert;
+    if (alert?.severity === 'moderate') return true;
+    if (!alert && analysis.red_flags && analysis.red_flags.length > 0 && !criticalCases.includes(c)) {
+      return true;
+    }
+    return false;
+  });
+
   const failedCases = cases.filter((c) => c.status === 'FAILED');
 
   // Relative Date Formatter
@@ -174,7 +196,7 @@ export default function DoctorDashboardPage() {
             className="flex items-center space-x-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-xl shadow-lg shadow-sky-600/25 transition-all text-sm"
           >
             <PlusCircle className="h-4 w-4" />
-            <span>+ New Clinical Query</span>
+            <span>New Clinical Query</span>
           </Link>
           <Link
             href="/cases"
@@ -391,20 +413,20 @@ export default function DoctorDashboardPage() {
           </div>
 
           <div className="space-y-4">
-            {/* 1. High-risk analyses */}
+            {/* 1. Recent High Severity Cases */}
             <div className="p-4 bg-red-950/30 border border-red-500/30 rounded-2xl space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-red-400">
                 <span className="flex items-center space-x-1.5 uppercase tracking-wider">
                   <AlertTriangle className="h-4 w-4" />
-                  <span>High-Risk Analyses (Red Flags Identified)</span>
+                  <span>Recent High Severity Cases</span>
                 </span>
                 <span className="px-2 py-0.5 bg-red-500/20 rounded font-mono text-red-300">
-                  {highRiskCases.length}
+                  {criticalCases.length}
                 </span>
               </div>
-              {highRiskCases.length > 0 ? (
+              {criticalCases.length > 0 ? (
                 <ul className="space-y-1.5 text-xs text-red-200">
-                  {highRiskCases.slice(0, 3).map((c) => (
+                  {criticalCases.slice(0, 3).map((c) => (
                     <li key={c.id} className="flex items-center justify-between">
                       <span className="truncate max-w-[280px]">• {c.caseText}</span>
                       <Link
@@ -417,24 +439,24 @@ export default function DoctorDashboardPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-400 italic">No urgent high-risk red flags detected in active cases.</p>
+                <p className="text-xs text-slate-400 italic">No urgent high severity emergency cases detected.</p>
               )}
             </div>
 
-            {/* 2. Queries requiring physician review */}
+            {/* 2. Recent Moderate Severity Cases */}
             <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-amber-400">
                 <span className="flex items-center space-x-1.5 uppercase tracking-wider">
-                  <Clock className="h-4 w-4" />
-                  <span>Queries Requiring Physician Review</span>
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Recent Moderate Severity Cases</span>
                 </span>
                 <span className="px-2 py-0.5 bg-amber-500/20 rounded font-mono text-amber-300">
-                  {pendingReviewCases.length}
+                  {moderateCases.length}
                 </span>
               </div>
-              {pendingReviewCases.length > 0 ? (
+              {moderateCases.length > 0 ? (
                 <ul className="space-y-1.5 text-xs text-amber-200">
-                  {pendingReviewCases.slice(0, 3).map((c) => (
+                  {moderateCases.slice(0, 3).map((c) => (
                     <li key={c.id} className="flex items-center justify-between">
                       <span className="truncate max-w-[280px]">• {c.caseText}</span>
                       <Link
@@ -447,16 +469,16 @@ export default function DoctorDashboardPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-400 italic">All submitted clinical queries have completed initial AI analysis.</p>
+                <p className="text-xs text-slate-400 italic">No moderate severity clinical concerns detected.</p>
               )}
             </div>
 
-            {/* 3. Failed/incomplete analyses */}
+            {/* 3. Recent Failed Queries */}
             <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span className="flex items-center space-x-1.5 uppercase tracking-wider">
                   <Zap className="h-4 w-4 text-slate-400" />
-                  <span>Failed / Incomplete Analyses</span>
+                  <span>Recent Failed Queries</span>
                 </span>
                 <span className="px-2 py-0.5 bg-slate-800 rounded font-mono text-slate-300">
                   {failedCases.length}
@@ -466,7 +488,7 @@ export default function DoctorDashboardPage() {
                 <ul className="space-y-1 text-xs text-slate-300">
                   {failedCases.slice(0, 3).map((c) => (
                     <li key={c.id} className="flex items-center justify-between">
-                      <span className="truncate max-w-[280px]">• #{c.id.slice(0, 8)}</span>
+                      <span className="truncate max-w-[280px]">• #{c.id.slice(0, 8)}: {c.caseText}</span>
                       <Link href={`/cases/${c.id}`} className="text-sky-400 underline">
                         Retry
                       </Link>
@@ -474,7 +496,7 @@ export default function DoctorDashboardPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-500 italic">Zero processing failures recorded.</p>
+                <p className="text-xs text-slate-500 italic">Zero failed queries recorded.</p>
               )}
             </div>
           </div>
