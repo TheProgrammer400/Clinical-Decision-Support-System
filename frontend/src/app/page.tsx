@@ -22,8 +22,11 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
+  const [activeSection, setActiveSection] = React.useState<string>('overview');
+
   const handleScroll = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
+    setActiveSection(id);
     const element = document.getElementById(id);
     if (element) {
       const yOffset = -80;
@@ -31,6 +34,84 @@ export default function HomePage() {
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
   };
+
+  React.useEffect(() => {
+    const sectionIds = ['overview', 'how-it-works', 'capabilities', 'safety'];
+
+    const updateActiveSection = () => {
+      const scrollPosition = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      // Edge case: Top of the page -> activate the first section ('overview')
+      if (scrollPosition < 80) {
+        setActiveSection('overview');
+        return;
+      }
+
+      // Edge case: Near bottom of the page -> activate the last section ('safety')
+      if (scrollPosition + windowHeight >= documentHeight - 50) {
+        setActiveSection('safety');
+        return;
+      }
+
+      // Dynamic focal offset line: 35% down the active viewport
+      const targetLine = windowHeight * 0.35;
+      let current = 'overview';
+
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= targetLine) {
+            current = id;
+          }
+        }
+      }
+
+      setActiveSection(current);
+    };
+
+    // Primary IntersectionObserver for efficient viewport monitoring
+    const observerOptions: IntersectionObserverInit = {
+      root: null,
+      rootMargin: '-80px 0px -40% 0px',
+      threshold: [0, 0.25, 0.5, 0.75, 1.0],
+    };
+
+    const observer = new IntersectionObserver(() => {
+      updateActiveSection();
+    }, observerOptions);
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    // Passive scroll & resize listener with requestAnimationFrame for smooth updates
+    let ticking = false;
+    const handleScrollOrResize = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          updateActiveSection();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Initial check on mount
+    updateActiveSection();
+
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true });
+    window.addEventListener('resize', handleScrollOrResize, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col font-body selection:bg-primary selection:text-on-primary">
@@ -52,43 +133,50 @@ export default function HomePage() {
           <a
             href="#overview"
             onClick={handleScroll('overview')}
-            className="text-primary font-bold border-b-2 border-primary pb-0.5 text-sm transition-colors"
+            className={
+              activeSection === 'overview'
+                ? 'text-primary font-bold border-b-2 border-primary pb-0.5 text-sm transition-colors'
+                : 'text-on-surface-variant hover:text-on-surface transition-colors text-sm'
+            }
           >
             Platform
           </a>
           <a
             href="#how-it-works"
             onClick={handleScroll('how-it-works')}
-            className="text-on-surface-variant hover:text-on-surface transition-colors text-sm"
+            className={
+              activeSection === 'how-it-works'
+                ? 'text-primary font-bold border-b-2 border-primary pb-0.5 text-sm transition-colors'
+                : 'text-on-surface-variant hover:text-on-surface transition-colors text-sm'
+            }
           >
             Reasoning
           </a>
           <a
-            href="#safety"
-            onClick={handleScroll('safety')}
-            className="text-on-surface-variant hover:text-on-surface transition-colors text-sm"
-          >
-            Governance
-          </a>
-          <a
             href="#capabilities"
             onClick={handleScroll('capabilities')}
-            className="text-on-surface-variant hover:text-on-surface transition-colors text-sm"
+            className={
+              activeSection === 'capabilities'
+                ? 'text-primary font-bold border-b-2 border-primary pb-0.5 text-sm transition-colors'
+                : 'text-on-surface-variant hover:text-on-surface transition-colors text-sm'
+            }
           >
-            Versioning
+            Capabilities
+          </a>
+          <a
+            href="#safety"
+            onClick={handleScroll('safety')}
+            className={
+              activeSection === 'safety'
+                ? 'text-primary font-bold border-b-2 border-primary pb-0.5 text-sm transition-colors'
+                : 'text-on-surface-variant hover:text-on-surface transition-colors text-sm'
+            }
+          >
+            Governance
           </a>
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              const el = document.getElementById('capabilities');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="text-sm font-medium text-on-surface hover:text-primary transition-colors hidden sm:block"
-          >
-            Request Demo
-          </button>
           <Link
             href="/login"
             className="bg-primary hover:bg-primary-fixed-dim text-on-primary text-sm font-bold py-1.5 px-4 rounded-full transition-colors active:scale-95 duration-200 flex items-center gap-1.5"
