@@ -291,6 +291,15 @@ export default function CaseDetailPage() {
 
           const isCritical = severity === 'critical';
           const isModerate = severity === 'moderate';
+          const isLow = severity === 'low';
+
+          const title =
+            alertData?.title ||
+            (isCritical
+              ? 'CRITICAL — URGENT EMERGENCY RULE-OUTS'
+              : isModerate
+              ? 'MODERATE — CLINICAL CONCERNS TO MONITOR'
+              : 'LOW — NO IMMEDIATE RED FLAGS IDENTIFIED');
 
           return (
             <div
@@ -312,14 +321,12 @@ export default function CaseDetailPage() {
                 }`}
               >
                 <div className="flex items-center gap-2.5 font-bold text-xs uppercase tracking-wider">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>
-                    {isCritical
-                      ? 'Critical Emergency Concerns'
-                      : isModerate
-                      ? 'Moderate Clinical Concerns & Red Flags'
-                      : 'Low Severity Clinical Findings'}
-                  </span>
+                  {isLow ? (
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-tertiary" />
+                  ) : (
+                    <AlertTriangle className={`h-4 w-4 shrink-0 ${isCritical ? 'text-error animate-pulse' : 'text-amber-400'}`} />
+                  )}
+                  <span>{title}</span>
                 </div>
                 <span
                   className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold uppercase border ${
@@ -354,6 +361,21 @@ export default function CaseDetailPage() {
                       <p className="leading-snug">{item}</p>
                     </div>
                   ))
+                ) : isLow ? (
+                  <>
+                    <div className="flex gap-2.5 items-start bg-tertiary/10 border border-tertiary/20 p-3 rounded text-xs text-tertiary font-medium">
+                      <span className="w-2 h-2 rounded-full bg-tertiary block mt-1 shrink-0"></span>
+                      <p className="leading-snug">
+                        No immediate emergency features identified from the information provided.
+                      </p>
+                    </div>
+                    <div className="flex gap-2.5 items-start bg-tertiary/10 border border-tertiary/20 p-3 rounded text-xs text-tertiary font-medium">
+                      <span className="w-2 h-2 rounded-full bg-tertiary block mt-1 shrink-0"></span>
+                      <p className="leading-snug">
+                        Monitor for symptom escalation such as acute swelling, warmth, fever, inability to bear weight, or rapidly worsening pain.
+                      </p>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="flex gap-2.5 items-start bg-amber-500/10 border border-amber-500/20 p-3 rounded text-xs text-amber-200">
