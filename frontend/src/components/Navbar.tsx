@@ -26,25 +26,33 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  if (pathname === '/' || pathname === '/login' || pathname === '/register') {
+  if (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/dashboard' ||
+    pathname.startsWith('/cases') ||
+    pathname.startsWith('/admin')
+  ) {
     return null;
   }
 
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-slate-800">
+    <header className="sticky top-0 z-50 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-3">
             <Link
               href={user && (user.role === 'ORG_ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/dashboard'}
-              className="flex items-center space-x-3 text-sky-400 font-bold text-xl tracking-tight"
+              className="flex items-center space-x-3 text-primary font-bold text-xl tracking-tight"
             >
-              <div className="p-2 bg-sky-500/10 rounded-lg border border-sky-500/20">
-                <Activity className="h-6 w-6 text-sky-400" />
+              <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                <Activity className="h-6 w-6 text-primary" />
               </div>
-              <span>CDSS <span className="text-xs font-normal text-slate-400 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700">Groq v1.4</span></span>
+              <span className="font-headline font-bold text-on-surface">Obsidian CDSS <span className="text-xs font-mono font-normal text-on-surface-variant px-2 py-0.5 bg-surface-container-highest rounded-full border border-outline-variant">Groq v1.4</span></span>
             </Link>
           </div>
+
 
           <nav className="flex items-center space-x-1 sm:space-x-4">
             {user && (user.role === 'ORG_ADMIN' || user.role === 'SUPER_ADMIN') ? (
