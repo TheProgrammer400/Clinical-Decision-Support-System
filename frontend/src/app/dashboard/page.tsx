@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Activity,
-  PlusCircle,
+  Plus,
   FileText,
   Clock,
   CheckCircle2,
@@ -15,9 +15,10 @@ import {
   ArrowRight,
   RefreshCw,
   Eye,
-  ShieldAlert,
-  UserCheck,
-  Zap,
+  Database,
+  ArrowUp,
+  Stethoscope,
+  TrendingUp,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -51,7 +52,7 @@ export default function DoctorDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  // Compute Stats
+  // Compute Metrics
   const totalQueries = cases.length;
   const pendingQueries = cases.filter((c) => c.status === 'PENDING').length;
   const completedAnalyses = cases.filter((c) => c.status === 'COMPLETED').length;
@@ -118,10 +119,10 @@ export default function DoctorDashboardPage() {
       feed.push({
         id: `submit_${c.id}`,
         type: 'Query submitted',
-        title: `Clinical query submitted: "${c.caseText.slice(0, 45)}..."`,
+        title: `New clinical case data recorded for "${c.caseText.slice(0, 45)}..."`,
         time: formatRelativeDate(c.createdAt),
         caseId: c.id,
-        color: 'text-sky-400 border-sky-500/30 bg-sky-500/10',
+        color: 'text-primary border-primary/30 bg-primary/10',
       });
 
       // 2. MRI Analysis Completed
@@ -131,10 +132,10 @@ export default function DoctorDashboardPage() {
             feed.push({
               id: `mri_${mri.id}`,
               type: 'MRI analysis completed',
-              title: `PyTorch U-Net GPU segmentation generated for "${mri.originalFilename}"`,
+              title: `PyTorch U-Net GPU segmentation generated for "${mri.originalFilename || 'MRI Scan'}"`,
               time: formatRelativeDate(mri.createdAt || c.createdAt),
               caseId: c.id,
-              color: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
+              color: 'text-primary border-primary/30 bg-primary/10',
             });
           }
         });
@@ -147,10 +148,10 @@ export default function DoctorDashboardPage() {
           feed.push({
             id: `analysis_${analysis.id}`,
             type: 'Clinical analysis generated',
-            title: `Groq LLM probabilistic differential reasoning completed (${analysis.modelName})`,
+            title: `Analysis completed for "${c.caseText.slice(0, 40)}..."`,
             time: formatRelativeDate(analysis.createdAt || c.createdAt),
             caseId: c.id,
-            color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
+            color: 'text-tertiary border-tertiary/30 bg-tertiary/10',
           });
         }
       }
@@ -164,234 +165,211 @@ export default function DoctorDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <Activity className="h-10 w-10 text-sky-400 animate-spin" />
-        <div className="text-slate-400 text-sm font-medium">Loading Doctor Dashboard...</div>
+        <Activity className="h-10 w-10 text-primary animate-spin" />
+        <div className="text-on-surface-variant text-sm font-medium">Loading Doctor Dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 py-8 pb-12">
-      {/* Top Welcome Banner & Quick Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 glass-panel rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-sky-950/20">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-              Doctor Dashboard
-            </h1>
-            <span className="px-3 py-1 bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs font-semibold rounded-full flex items-center space-x-1.5">
-              <UserCheck className="h-3.5 w-3.5" />
-              <span>{user?.fullName || 'Physician'}</span>
-            </span>
-          </div>
-          <p className="text-sm text-slate-400">
-            Welcome back, {user?.fullName || 'Doctor'}. Here is your clinical decision support overview.
-          </p>
+    <div className="flex-grow p-6 md:p-8 max-w-[1600px] mx-auto w-full flex flex-col gap-8 font-body">
+      {/* 1. HEADER SECTION */}
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-headline font-bold tracking-tight text-on-surface">Overview</h1>
+          <p className="text-on-surface-variant text-sm mt-1">System status and clinical query summary.</p>
         </div>
-
-        {/* Quick Actions Bar */}
-        <div className="flex items-center space-x-3 self-start md:self-auto">
+        <div className="flex items-center gap-4">
           <Link
             href="/cases/new"
-            className="flex items-center space-x-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-xl shadow-lg shadow-sky-600/25 transition-all text-sm"
+            className="bg-primary text-on-primary px-4 py-2 rounded-md text-sm font-medium hover:bg-surface-tint transition-colors flex items-center gap-2 shadow-sm"
           >
-            <PlusCircle className="h-4 w-4" />
-            <span>New Clinical Query</span>
-          </Link>
-          <Link
-            href="/cases"
-            className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-xl border border-slate-700 transition-colors text-sm"
-          >
-            <FileText className="h-4 w-4" />
-            <span>View All Queries</span>
+            <Plus className="h-4 w-4" />
+            <span>New Query</span>
           </Link>
           <button
             onClick={fetchDashboardData}
-            title="Refresh Metrics"
-            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700 transition-colors"
+            title="Refresh Dashboard"
+            className="p-2 bg-surface-container border border-outline-variant hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface rounded-md transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
+          <div className="text-sm text-on-surface-variant hidden sm:block">
+            Last updated: <span className="text-on-surface font-medium">Just now</span>
+          </div>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start space-x-3 text-red-400 text-sm">
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+        <div className="p-4 bg-error-container/40 border border-error/30 rounded-lg flex items-start gap-3 text-on-error-container text-sm">
+          <AlertTriangle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* TOP STATS GRID (4 CARDS) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Stat 1: Total Queries */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group hover:border-sky-500/40 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Queries</span>
-            <div className="p-2.5 bg-sky-500/10 rounded-xl border border-sky-500/20 text-sky-400">
-              <FileText className="h-5 w-5" />
-            </div>
+      {/* 2. DASHBOARD OVERVIEW GRID (Bento Style 4 Cards) */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric Card 1: Total Queries */}
+        <div className="bg-surface-container border border-outline-variant rounded-lg p-5 flex flex-col justify-between hover:bg-surface-container-highest transition-colors cursor-pointer group">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm text-on-secondary-container font-medium">Total Queries</span>
+            <Database className="h-5 w-5 text-on-surface-variant group-hover:text-primary transition-colors" />
           </div>
-          <div className="text-3xl font-extrabold text-slate-100 font-mono tracking-tight">
-            {totalQueries}
-          </div>
-          <p className="text-xs text-slate-500">Submitted clinical presentation records</p>
-        </div>
-
-        {/* Stat 2: Pending Queries */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group hover:border-amber-500/40 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Pending Queries</span>
-            <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">
-              <Clock className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-amber-400 font-mono tracking-tight">
-            {pendingQueries}
-          </div>
-          <p className="text-xs text-slate-500">Awaiting LLM clinical evaluation</p>
-        </div>
-
-        {/* Stat 3: Completed Analyses */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group hover:border-emerald-500/40 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Completed Analyses</span>
-            <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-emerald-400 font-mono tracking-tight">
-            {completedAnalyses}
-          </div>
-          <p className="text-xs text-slate-500">Evaluated with differential reasoning</p>
-        </div>
-
-        {/* Stat 4: MRI-Assisted Cases */}
-        <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 space-y-3 relative overflow-hidden group hover:border-purple-500/50 bg-purple-950/10 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-300">MRI-Assisted Cases</span>
-            <div className="p-2.5 bg-purple-500/10 rounded-xl border border-purple-500/30 text-purple-400">
-              <Cpu className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-purple-300 font-mono tracking-tight">
-            {mriAssistedCases}
-          </div>
-          <p className="text-xs text-slate-400">Quantitative PyTorch U-Net GPU segmentation</p>
-        </div>
-      </div>
-
-      {/* MAIN SECTION: RECENT QUERIES TABLE */}
-      <div className="glass-panel rounded-3xl border border-slate-800 p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
-              <Activity className="h-5 w-5 text-sky-400" />
-              <span>Recent Queries</span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Latest clinical cases and decision support status overview.
-            </p>
+            <div className="text-4xl font-headline font-semibold text-on-surface tracking-tighter">
+              {totalQueries}
+            </div>
+            <div className="text-xs text-on-surface-variant mt-2 flex items-center gap-1">
+              <ArrowUp className="h-3 w-3 text-tertiary" />
+              <span className="text-tertiary font-medium">100%</span> from last week
+            </div>
           </div>
+        </div>
+
+        {/* Metric Card 2: Pending Queries */}
+        <div className="bg-surface-container border border-outline-variant rounded-lg p-5 flex flex-col justify-between hover:bg-surface-container-highest transition-colors cursor-pointer group">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm text-on-secondary-container font-medium">Pending Queries</span>
+            <Clock className="h-5 w-5 text-on-surface-variant group-hover:text-primary transition-colors" />
+          </div>
+          <div>
+            <div className="text-4xl font-headline font-semibold text-on-surface tracking-tighter">
+              {pendingQueries}
+            </div>
+            <div className="text-xs text-on-surface-variant mt-2">
+              {pendingQueries === 0 ? 'All clear.' : `${pendingQueries} awaiting clinical analysis.`}
+            </div>
+          </div>
+        </div>
+
+        {/* Metric Card 3: Completed Analyses */}
+        <div className="bg-surface-container border border-outline-variant rounded-lg p-5 flex flex-col justify-between hover:bg-surface-container-highest transition-colors cursor-pointer group">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm text-on-secondary-container font-medium">Completed Analyses</span>
+            <CheckCircle2 className="h-5 w-5 text-on-surface-variant group-hover:text-tertiary transition-colors" />
+          </div>
+          <div>
+            <div className="text-4xl font-headline font-semibold text-on-surface tracking-tighter">
+              {completedAnalyses}
+            </div>
+            <div className="text-xs text-on-surface-variant mt-2">
+              Avg processing time: 1.2s
+            </div>
+          </div>
+        </div>
+
+        {/* Metric Card 4: MRI-Assisted Cases */}
+        <div className="bg-surface-container border border-outline-variant rounded-lg p-5 flex flex-col justify-between hover:bg-surface-container-highest transition-colors cursor-pointer group">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm text-on-secondary-container font-medium">MRI-Assisted Cases</span>
+            <Stethoscope className="h-5 w-5 text-on-surface-variant group-hover:text-primary transition-colors" />
+          </div>
+          <div>
+            <div className="text-4xl font-headline font-semibold text-on-surface tracking-tighter">
+              {mriAssistedCases}
+            </div>
+            <div className="text-xs text-on-surface-variant mt-2">
+              {mriAssistedCases === 0 ? 'Requires imaging data upload.' : 'PyTorch U-Net GPU active'}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. RECENT QUERIES TABLE SECTION */}
+      <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+          <h2 className="text-lg font-headline font-semibold text-on-surface">Recent Queries</h2>
           <Link
             href="/cases"
-            className="text-xs text-sky-400 hover:text-sky-300 font-medium flex items-center space-x-1"
+            className="text-sm text-primary hover:text-surface-tint transition-colors font-medium"
           >
-            <span>View All</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            View All
           </Link>
         </div>
 
         {cases.length === 0 ? (
           <div className="p-12 text-center space-y-4">
-            <FileText className="h-12 w-12 text-slate-600 mx-auto" />
-            <div className="text-slate-400 text-sm">No clinical queries found.</div>
+            <FileText className="h-10 w-10 text-on-surface-variant mx-auto opacity-50" />
+            <div className="text-on-surface-variant text-sm">No clinical queries recorded yet.</div>
             <Link
               href="/cases/new"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white font-medium rounded-xl text-xs"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium rounded-md text-xs hover:bg-surface-tint transition-colors"
             >
-              <PlusCircle className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
               <span>Submit First Clinical Query</span>
             </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/80 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="text-xs text-on-secondary-container bg-surface-container-lowest border-b border-outline-variant">
                 <tr>
-                  <th scope="col" className="py-3.5 px-4">Query</th>
-                  <th scope="col" className="py-3.5 px-4">Created</th>
-                  <th scope="col" className="py-3.5 px-4">MRI</th>
-                  <th scope="col" className="py-3.5 px-4">Status</th>
-                  <th scope="col" className="py-3.5 px-4 text-right">Action</th>
+                  <th className="px-5 py-3 font-medium" scope="col">Query</th>
+                  <th className="px-5 py-3 font-medium" scope="col">Created</th>
+                  <th className="px-5 py-3 font-medium" scope="col">MRI Status</th>
+                  <th className="px-5 py-3 font-medium" scope="col">Status</th>
+                  <th className="px-5 py-3 font-medium text-right" scope="col">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {cases.slice(0, 7).map((c) => {
+              <tbody className="divide-y divide-outline-variant">
+                {cases.slice(0, 5).map((c) => {
                   const hasMri = c.mriAnalyses && c.mriAnalyses.length > 0;
                   const relativeCreated = formatRelativeDate(c.createdAt);
 
                   return (
-                    <tr key={c.id} className="hover:bg-slate-900/50 transition-colors">
-                      {/* Query Narrative */}
-                      <td className="py-4 px-4">
-                        <div className="font-medium text-slate-100 max-w-md truncate">
+                    <tr key={c.id} className="hover:bg-surface-container-highest transition-colors group">
+                      {/* Query snippet */}
+                      <td className="px-5 py-4">
+                        <div className="text-on-surface max-w-md truncate font-medium">
                           {c.caseText}
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                          ID: #{c.id.slice(0, 8)}
                         </div>
                       </td>
 
                       {/* Created */}
-                      <td className="py-4 px-4 text-xs text-slate-400 font-medium">
+                      <td className="px-5 py-4 text-on-surface-variant">
                         {relativeCreated}
                       </td>
 
-                      {/* MRI Badge */}
-                      <td className="py-4 px-4">
+                      {/* MRI Status Badge */}
+                      <td className="px-5 py-4">
                         {hasMri ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                            <Cpu className="h-3 w-3 text-purple-400" />
-                            <span>Yes</span>
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-primary-fixed/10 text-primary border border-primary/20">
+                            Yes
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-surface-variant text-on-surface-variant border border-outline-variant">
                             No
                           </span>
                         )}
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                            c.status === 'COMPLETED'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : c.status === 'FAILED'
-                              ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                          }`}
-                        >
-                          {c.status === 'COMPLETED' && <CheckCircle2 className="h-3 w-3" />}
-                          {c.status === 'PENDING' && <Clock className="h-3 w-3" />}
-                          {c.status === 'FAILED' && <AlertTriangle className="h-3 w-3" />}
-                          <span>{c.status}</span>
-                        </span>
+                      <td className="px-5 py-4">
+                        {c.status === 'COMPLETED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-tertiary-fixed/10 text-tertiary border border-tertiary/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                            Completed
+                          </span>
+                        ) : c.status === 'PENDING' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                            Pending
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-error-container/40 text-error border border-error/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-error"></span>
+                            Failed
+                          </span>
+                        )}
                       </td>
 
                       {/* Action Button */}
-                      <td className="py-4 px-4 text-right">
+                      <td className="px-5 py-4 text-right">
                         <Link
-                          href={c.status === 'PENDING' ? `/cases/${c.id}` : `/cases/${c.id}`}
-                          className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            c.status === 'PENDING'
-                              ? 'bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 border border-amber-500/30'
-                              : 'bg-sky-600/20 text-sky-300 hover:bg-sky-600/30 border border-sky-500/30'
-                          }`}
+                          href={`/cases/${c.id}`}
+                          className="text-primary hover:text-surface-tint font-medium text-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                          <span>{c.status === 'PENDING' ? 'Continue' : 'View'}</span>
+                          View
                         </Link>
                       </td>
                     </tr>
@@ -401,145 +379,77 @@ export default function DoctorDashboardPage() {
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* TWO COLUMN GRID: PRIORITY / ATTENTION & RECENT ACTIVITY */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* PANEL 1: PRIORITY / ATTENTION */}
-        <div className="glass-panel rounded-3xl border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
-            <ShieldAlert className="h-5 w-5 text-amber-400" />
-            <h2 className="text-base font-bold text-slate-100">Priority / Attention</h2>
+      {/* 4. TWO COLUMN LAYOUT: ATTENTION REQUIRED & RECENT ACTIVITY */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Attention Required */}
+        <div className="lg:col-span-1 flex flex-col gap-4">
+          <h2 className="text-lg font-headline font-semibold text-on-surface">Attention Required</h2>
+          
+          {/* Card 1: High Severity */}
+          <div className="bg-surface-container border border-error/20 rounded-lg p-5 flex flex-col gap-3 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-error"></div>
+            <div className="flex items-center gap-2 text-error">
+              <AlertTriangle className="h-4 w-4" />
+              <h3 className="font-medium text-sm">Recent High Severity Cases</h3>
+            </div>
+            <div className="text-3xl font-headline font-semibold text-on-surface">
+              {criticalCases.length}
+            </div>
+            <p className="text-xs text-on-surface-variant">Review recommended immediately.</p>
           </div>
 
-          <div className="space-y-4">
-            {/* 1. Recent High Severity Cases */}
-            <div className="p-4 bg-red-950/30 border border-red-500/30 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-red-400">
-                <span className="flex items-center space-x-1.5 uppercase tracking-wider">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>Recent High Severity Cases</span>
-                </span>
-                <span className="px-2 py-0.5 bg-red-500/20 rounded font-mono text-red-300">
-                  {criticalCases.length}
-                </span>
-              </div>
-              {criticalCases.length > 0 ? (
-                <ul className="space-y-1.5 text-xs text-red-200">
-                  {criticalCases.slice(0, 3).map((c) => (
-                    <li key={c.id} className="flex items-center justify-between">
-                      <span className="truncate max-w-[280px]">• {c.caseText}</span>
-                      <Link
-                        href={`/cases/${c.id}`}
-                        className="text-red-400 underline font-semibold flex items-center space-x-1 ml-2"
-                      >
-                        <span>Review</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-400 italic">No urgent high severity emergency cases detected.</p>
-              )}
+          {/* Card 2: Moderate Severity */}
+          <div className="bg-surface-container border border-orange-500/20 rounded-lg p-5 flex flex-col gap-3 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+            <div className="flex items-center gap-2 text-orange-500">
+              <AlertCircle className="h-4 w-4" />
+              <h3 className="font-medium text-sm">Recent Moderate Severity Cases</h3>
             </div>
-
-            {/* 2. Recent Moderate Severity Cases */}
-            <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-amber-400">
-                <span className="flex items-center space-x-1.5 uppercase tracking-wider">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Recent Moderate Severity Cases</span>
-                </span>
-                <span className="px-2 py-0.5 bg-amber-500/20 rounded font-mono text-amber-300">
-                  {moderateCases.length}
-                </span>
-              </div>
-              {moderateCases.length > 0 ? (
-                <ul className="space-y-1.5 text-xs text-amber-200">
-                  {moderateCases.slice(0, 3).map((c) => (
-                    <li key={c.id} className="flex items-center justify-between">
-                      <span className="truncate max-w-[280px]">• {c.caseText}</span>
-                      <Link
-                        href={`/cases/${c.id}`}
-                        className="text-amber-400 underline font-semibold ml-2"
-                      >
-                        <span>Evaluate</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-400 italic">No moderate severity clinical concerns detected.</p>
-              )}
+            <div className="text-3xl font-headline font-semibold text-on-surface">
+              {moderateCases.length}
             </div>
-
-            {/* 3. Recent Failed Queries */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-                <span className="flex items-center space-x-1.5 uppercase tracking-wider">
-                  <Zap className="h-4 w-4 text-slate-400" />
-                  <span>Recent Failed Queries</span>
-                </span>
-                <span className="px-2 py-0.5 bg-slate-800 rounded font-mono text-slate-300">
-                  {failedCases.length}
-                </span>
-              </div>
-              {failedCases.length > 0 ? (
-                <ul className="space-y-1 text-xs text-slate-300">
-                  {failedCases.slice(0, 3).map((c) => (
-                    <li key={c.id} className="flex items-center justify-between">
-                      <span className="truncate max-w-[280px]">• #{c.id.slice(0, 8)}: {c.caseText}</span>
-                      <Link href={`/cases/${c.id}`} className="text-sky-400 underline">
-                        Retry
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-500 italic">Zero failed queries recorded.</p>
-              )}
-            </div>
+            <p className="text-xs text-on-surface-variant">Monitor progression.</p>
           </div>
         </div>
 
-        {/* PANEL 2: RECENT ACTIVITY FEED */}
-        <div className="glass-panel rounded-3xl border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center space-x-2">
-              <Zap className="h-5 w-5 text-sky-400" />
-              <h2 className="text-base font-bold text-slate-100">Recent Activity</h2>
-            </div>
-            <span className="text-xs text-slate-500 font-mono">Live Timeline</span>
-          </div>
-
-          {activityFeed.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">No recent system activity recorded.</div>
-          ) : (
-            <div className="space-y-3 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
-              {activityFeed.map((item) => (
-                <div key={item.id} className="flex items-start space-x-3 relative z-10">
-                  <div className={`p-1.5 rounded-full border text-[10px] ${item.color}`}>
-                    <Activity className="h-3 w-3" />
-                  </div>
-                  <div className="flex-1 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-200">{item.type}</span>
-                      <span className="text-[11px] text-slate-500">{item.time}</span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-snug">{item.title}</p>
+        {/* Right Column: Recent Activity Feed Timeline */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <h2 className="text-lg font-headline font-semibold text-on-surface">Recent Activity</h2>
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-6">
+            {activityFeed.length === 0 ? (
+              <p className="text-xs text-on-surface-variant italic">No recent system activity recorded.</p>
+            ) : (
+              <ol className="relative border-l border-outline-variant ml-3 space-y-6">
+                {activityFeed.map((item) => (
+                  <li key={item.id} className="pl-6 relative">
+                    <span className="absolute flex items-center justify-center w-6 h-6 bg-surface-container rounded-full -left-3 ring-4 ring-surface-container-highest border border-primary">
+                      <span className="w-2 h-2 bg-primary rounded-full"></span>
+                    </span>
+                    <h3 className="flex items-center mb-1 text-sm font-medium text-on-surface">
+                      {item.type}
+                    </h3>
+                    <time className="block mb-2 text-xs font-normal leading-none text-on-surface-variant">
+                      {item.time}
+                    </time>
+                    <p className="mb-2 text-sm font-normal text-on-secondary-container">
+                      {item.title}
+                    </p>
                     <Link
                       href={`/cases/${item.caseId}`}
-                      className="text-[11px] text-sky-400 hover:underline font-medium inline-block pt-1"
+                      className="inline-flex items-center text-xs font-medium text-primary hover:text-surface-tint transition-colors"
                     >
-                      View Case Record →
+                      <span>View Case Record</span>
+                      <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
