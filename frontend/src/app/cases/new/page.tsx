@@ -17,6 +17,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import DoctorSidebar from '@/components/DoctorSidebar';
 
 export default function NewCasePage() {
   const router = useRouter();
@@ -132,7 +133,9 @@ export default function NewCasePage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background text-on-surface font-body selection:bg-primary selection:text-on-primary">
+    <div className="flex min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary selection:text-on-primary">
+      <DoctorSidebar />
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Top App Bar Header */}
       <header className="flex items-center justify-between px-8 py-5 border-b border-outline-variant bg-surface shrink-0">
         <div>
@@ -373,6 +376,7 @@ export default function NewCasePage() {
           </button>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

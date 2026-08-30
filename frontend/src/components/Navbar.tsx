@@ -26,7 +26,13 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  if (pathname === '/' || pathname === '/login' || pathname === '/register') {
+  if (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/dashboard' ||
+    pathname.startsWith('/cases')
+  ) {
     return null;
   }
 

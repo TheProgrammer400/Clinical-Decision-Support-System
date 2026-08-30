@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import DoctorSidebar from '@/components/DoctorSidebar';
 
 export default function CasesHistoryPage() {
   const [cases, setCases] = useState<any[]>([]);
@@ -30,7 +31,9 @@ export default function CasesHistoryPage() {
   }, [page]);
 
   return (
-    <div className="p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface">
+    <div className="flex min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary selection:text-on-primary">
+      <DoctorSidebar />
+      <div className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-outline-variant pb-6">
         <div>
@@ -159,6 +162,7 @@ export default function CasesHistoryPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
