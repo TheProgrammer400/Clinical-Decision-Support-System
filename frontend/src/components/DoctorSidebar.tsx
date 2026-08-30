@@ -43,19 +43,7 @@ export default function DoctorSidebar() {
       href: '/cases',
       icon: FileCheck,
       active: pathname === '/cases',
-    },
-    {
-      name: 'Patient History',
-      href: '/cases',
-      icon: History,
-      active: false,
-    },
-    {
-      name: 'Research',
-      href: '/dashboard',
-      icon: BookOpen,
-      active: false,
-    },
+    }
   ];
 
   return (

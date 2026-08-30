@@ -31,7 +31,8 @@ export default function Navbar() {
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/dashboard' ||
-    pathname.startsWith('/cases')
+    pathname.startsWith('/cases') ||
+    pathname.startsWith('/admin')
   ) {
     return null;
   }
