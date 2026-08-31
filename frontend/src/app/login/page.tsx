@@ -75,8 +75,18 @@ export default function LoginPage() {
         </header>
 
         {error && (
-          <div className="p-4 bg-error-container/40 border border-error/30 rounded-lg flex items-start gap-3 text-on-error-container text-sm">
-            <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
+          <div
+            className={`p-4 rounded-lg flex items-start gap-3 text-sm border ${
+              error.toLowerCase().includes('pending')
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                : 'bg-error-container/40 border-error/30 text-on-error-container'
+            }`}
+          >
+            <AlertCircle
+              className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                error.toLowerCase().includes('pending') ? 'text-amber-400 animate-pulse' : 'text-error'
+              }`}
+            />
             <span>{error}</span>
           </div>
         )}

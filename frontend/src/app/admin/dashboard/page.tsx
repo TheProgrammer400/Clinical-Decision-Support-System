@@ -18,6 +18,8 @@ import {
   UserCheck,
   UserX,
   Eye,
+  Bell,
+  Clock,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -75,7 +77,7 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const topStats = stats?.topStats || { totalDoctors: 2, totalQueries: 11, mriAnalysesCount: 3, activeAlertsCount: 0 };
+  const topStats = stats?.topStats || { totalDoctors: 2, totalQueries: 11, mriAnalysesCount: 3, activeAlertsCount: 0, pendingRegistrationsCount: 0 };
   const secondaryStats = stats?.secondaryStats || {};
   const health = stats?.systemHealth || {};
 
@@ -125,12 +127,33 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 4 Stat Row KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Stat Card 1: Total Doctors */}
+      {/* 5 Stat Row KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
+        {/* Stat Card 1: Pending Registrations */}
+        <Link
+          href="/admin/notifications"
+          className="p-5 rounded-lg border transition-all flex flex-col justify-between h-32 relative overflow-hidden group cursor-pointer hover:border-amber-500/50 bg-surface-container"
+        >
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Pending Registrations</span>
+            <div className="w-8 h-8 rounded border border-amber-500/30 bg-amber-500/10 flex items-center justify-center text-amber-400">
+              <Bell className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="flex justify-between items-end">
+            <span className={`text-3xl font-headline font-bold ${topStats.pendingRegistrationsCount > 0 ? 'text-amber-300' : 'text-on-surface'}`}>
+              {topStats.pendingRegistrationsCount || 0}
+            </span>
+            <span className="text-[10px] text-amber-400 font-mono flex items-center gap-1 group-hover:underline">
+              Review <ArrowRight className="h-3 w-3" />
+            </span>
+          </div>
+        </Link>
+
+        {/* Stat Card 2: Total Doctors */}
         <div className="p-5 rounded-lg border border-outline-variant bg-surface-container flex flex-col justify-between h-32 relative overflow-hidden group">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Doctors</span>
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Approved Doctors</span>
             <div className="w-8 h-8 rounded border border-outline-variant bg-surface-container-low flex items-center justify-center text-primary">
               <Users className="h-4 w-4" />
             </div>
@@ -140,7 +163,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Stat Card 2: Total Queries */}
+        {/* Stat Card 3: Total Queries */}
         <div className="p-5 rounded-lg border border-outline-variant bg-surface-container flex flex-col justify-between h-32 relative overflow-hidden group">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Queries</span>
@@ -153,7 +176,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Stat Card 3: MRI Analyses */}
+        {/* Stat Card 4: MRI Analyses */}
         <div className="p-5 rounded-lg border border-outline-variant bg-surface-container flex flex-col justify-between h-32 relative overflow-hidden group">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">MRI Analyses</span>
@@ -166,7 +189,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Stat Card 4: System Alerts */}
+        {/* Stat Card 5: System Alerts */}
         <div className="p-5 rounded-lg border border-outline-variant bg-surface-container flex flex-col justify-between h-32 relative overflow-hidden group">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">System Alerts</span>

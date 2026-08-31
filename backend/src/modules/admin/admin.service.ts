@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AppConfigService } from '../config/config.service';
-import { Role } from '@prisma/client';
+import { Role, AccountStatus } from '@prisma/client';
 import * as torchCheck from 'child_process';
 
 @Injectable()
@@ -30,8 +30,9 @@ export class AdminService {
       failedMriCount,
       recentAuditLogs,
       doctorList,
+      pendingRegistrationsCount,
     ] = await Promise.all([
-      this.prisma.user.count({ where: { role: Role.DOCTOR } }),
+      this.prisma.user.count({ where: { role: Role.DOCTOR, accountStatus: AccountStatus.APPROVED } }),
       this.prisma.clinicalCase.count(),
       this.prisma.mriAnalysis.count(),
       this.prisma.clinicalCase.count({ where: { createdAt: { gte: startOfToday } } }),
@@ -48,7 +49,7 @@ export class AdminService {
         },
       }),
       this.prisma.user.findMany({
-        where: { role: Role.DOCTOR },
+        where: { role: Role.DOCTOR, accountStatus: AccountStatus.APPROVED },
         select: {
           id: true,
           email: true,
@@ -60,6 +61,7 @@ export class AdminService {
           },
         },
       }),
+      this.prisma.user.count({ where: { accountStatus: AccountStatus.PENDING } }),
     ]);
 
     const activeDoctorsCount = doctorList.filter(
@@ -128,6 +130,7 @@ export class AdminService {
         totalQueries,
         mriAnalysesCount,
         activeAlertsCount: activeAlerts.length,
+        pendingRegistrationsCount,
       },
       secondaryStats: {
         activeDoctors: activeDoctorsCount,
@@ -153,7 +156,7 @@ export class AdminService {
 
   async getDoctors() {
     const doctors = await this.prisma.user.findMany({
-      where: { role: Role.DOCTOR },
+      where: { role: Role.DOCTOR, accountStatus: AccountStatus.APPROVED },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -201,8 +204,8 @@ export class AdminService {
       where: { id: doctorId },
     });
 
-    if (!doctor || doctor.role !== Role.DOCTOR) {
-      throw new NotFoundException('Doctor user record not found');
+    if (!doctor || doctor.role !== Role.DOCTOR || doctor.accountStatus !== AccountStatus.APPROVED) {
+      throw new NotFoundException('Approved doctor user record not found');
     }
 
     const newVersion = status === 'Suspended' ? -1 : 1;
@@ -318,6 +321,112 @@ export class AdminService {
         gpuUtilizationPct: 62,
         gpuMemoryPct: 71,
       },
+    };
+  }
+
+  async getPendingRegistrationsCount() {
+    const count = await this.prisma.user.count({
+      where: { accountStatus: AccountStatus.PENDING },
+    });
+    return { count };
+  }
+
+  async getRegistrationRequests(statusFilter?: AccountStatus) {
+    const whereCondition = statusFilter ? { accountStatus: statusFilter } : {};
+    const users = await this.prisma.user.findMany({
+      where: whereCondition,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        accountStatus: true,
+        createdAt: true,
+        organization: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      role: u.role,
+      status: u.accountStatus,
+      createdAt: u.createdAt,
+      organizationName: u.organization?.name || 'N/A',
+    }));
+  }
+
+  async approveRegistrationRequest(userId: string, adminUserId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Registration request user record not found');
+    }
+
+    if (user.accountStatus !== AccountStatus.PENDING) {
+      throw new BadRequestException(`Registration request is not pending (current status: ${user.accountStatus})`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { accountStatus: AccountStatus.APPROVED },
+    });
+
+    await this.auditService.log({
+      actorUserId: adminUserId,
+      action: 'admin.registration_approve',
+      resourceType: 'User',
+      resourceId: userId,
+      metadata: { targetUserEmail: user.email },
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      fullName: updated.fullName,
+      status: updated.accountStatus,
+      message: 'Registration request approved. Account is now active.',
+    };
+  }
+
+  async rejectRegistrationRequest(userId: string, adminUserId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Registration request user record not found');
+    }
+
+    if (user.accountStatus !== AccountStatus.PENDING) {
+      throw new BadRequestException(`Registration request is not pending (current status: ${user.accountStatus})`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { accountStatus: AccountStatus.REJECTED },
+    });
+
+    await this.auditService.log({
+      actorUserId: adminUserId,
+      action: 'admin.registration_reject',
+      resourceType: 'User',
+      resourceId: userId,
+      metadata: { targetUserEmail: user.email },
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      fullName: updated.fullName,
+      status: updated.accountStatus,
+      message: 'Registration request rejected.',
     };
   }
 }

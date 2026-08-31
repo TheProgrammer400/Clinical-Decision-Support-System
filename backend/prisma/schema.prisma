@@ -13,6 +13,12 @@ enum Role {
   SUPER_ADMIN
 }
 
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum CaseStatus {
   PENDING
   COMPLETED
@@ -47,6 +53,7 @@ model User {
   email          String          @unique
   passwordHash   String          @map("password_hash")
   role           Role            @default(DOCTOR)
+  accountStatus  AccountStatus   @default(APPROVED) @map("account_status")
   fullName       String          @map("full_name")
   mfaEnabled     Boolean         @default(false) @map("mfa_enabled")
   refreshTokenVersion Int        @default(1) @map("refresh_token_version")

@@ -65,17 +65,6 @@ export default function DoctorSidebar() {
         </div>
       </div>
 
-      {/* Primary Action: New Analysis Button */}
-      <div className="px-4 py-4">
-        <Link
-          href="/cases/new"
-          className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-fixed-dim text-on-primary font-medium py-2.5 px-4 rounded-lg text-sm transition-all shadow-sm active:scale-[0.98]"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Analysis</span>
-        </Link>
-      </div>
-
       {/* Main Navigation Menu */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {navItems.map((item, idx) => {

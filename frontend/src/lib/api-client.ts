@@ -205,6 +205,35 @@ export const apiClient = {
     return res.json();
   },
 
+  async getPendingRegistrationsCount() {
+    const res = await fetchWithAuth('/admin/pending-registrations-count');
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getRegistrationRequests(status?: string) {
+    const query = status ? `?status=${status}` : '';
+    const res = await fetchWithAuth(`/admin/registration-requests${query}`);
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async approveRegistrationRequest(id: string) {
+    const res = await fetchWithAuth(`/admin/registration-requests/${id}/approve`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async rejectRegistrationRequest(id: string) {
+    const res = await fetchWithAuth(`/admin/registration-requests/${id}/reject`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
   async uploadMri(caseId: string, files: File[]) {
     const formData = new FormData();
     for (const file of files) {

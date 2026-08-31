@@ -110,3 +110,6 @@ infrastructure/
 
 # unneccessary files
 additional/
+
+# executable files
+*.sh

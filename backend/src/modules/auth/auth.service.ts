@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
@@ -6,7 +6,7 @@ import { AppConfigService } from '../config/config.service';
 import { AuditService } from '../audit/audit.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { Role } from '@prisma/client';
+import { Role, AccountStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -20,12 +20,52 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const emailClean = dto.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email: emailClean },
     });
 
     if (existing) {
-      throw new ConflictException('User with this email already exists');
+      if (existing.accountStatus === AccountStatus.PENDING) {
+        throw new ConflictException('Your registration request is pending admin approval. Please wait for approval before trying again.');
+      }
+      if (existing.accountStatus === AccountStatus.APPROVED) {
+        throw new ConflictException('An account with this email already exists.');
+      }
+      if (existing.accountStatus === AccountStatus.REJECTED) {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(dto.password, salt);
+        let organizationId = existing.organizationId;
+        if (dto.organizationName) {
+          const org = await this.prisma.organization.create({
+            data: { name: dto.organizationName },
+          });
+          organizationId = org.id;
+        }
+        const updatedUser = await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            fullName: dto.fullName,
+            accountStatus: AccountStatus.PENDING,
+            organizationId,
+          },
+        });
+        await this.auditService.log({
+          actorUserId: updatedUser.id,
+          action: 'auth.register_resubmitted',
+          resourceType: 'User',
+          resourceId: updatedUser.id,
+        });
+        return {
+          message: 'Your registration request has been re-submitted and is pending admin approval.',
+          status: AccountStatus.PENDING,
+        };
+      }
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -42,23 +82,27 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email.toLowerCase(),
+        email: emailClean,
         passwordHash,
         fullName: dto.fullName,
-        role: dto.role || Role.DOCTOR,
+        role: Role.DOCTOR,
+        accountStatus: AccountStatus.PENDING,
         organizationId,
       },
     });
 
     await this.auditService.log({
       actorUserId: user.id,
-      action: 'auth.register',
+      action: 'auth.register_pending',
       resourceType: 'User',
       resourceId: user.id,
       metadata: { role: user.role, organizationId: user.organizationId },
     });
 
-    return this.generateTokens(user);
+    return {
+      message: 'Registration request submitted successfully. Waiting for admin approval.',
+      status: AccountStatus.PENDING,
+    };
   }
 
   async login(dto: LoginDto, ipAddress?: string) {
@@ -68,6 +112,15 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Check account status before evaluating password match or returning session
+    if (user.accountStatus === AccountStatus.PENDING) {
+      throw new UnauthorizedException('Your registration request is still pending admin approval. Please wait for approval before signing in.');
+    }
+
+    if (user.accountStatus === AccountStatus.REJECTED) {
+      throw new UnauthorizedException('Your registration request was rejected by an administrator.');
     }
 
     const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
