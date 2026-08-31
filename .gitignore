@@ -104,9 +104,9 @@ scratch/
 *.md
 !README.md
 
-# Ignore AWS Infrastructure & GitHub CI/CD workflows
-.github/
-infrastructure/
+# Allow AWS Infrastructure & GitHub CI/CD workflows
+# .github/ and infrastructure/ are tracked for deployment
+
 
 # unneccessary files
 additional/
