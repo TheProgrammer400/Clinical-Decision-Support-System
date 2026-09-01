@@ -22,6 +22,8 @@ jobs:
         with:
           aws-region: ap-south-1
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          audience: sts.amazonaws.com
+
 
 
       - name: Log in to Amazon ECR
