@@ -2,7 +2,7 @@ name: CDSS CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, aws_migration ]
   workflow_dispatch:
 
 jobs:
@@ -16,8 +16,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: us-east-1
+          aws-region: ap-south-1
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
 
       - name: Log in to Amazon ECR
         id: login-ecr

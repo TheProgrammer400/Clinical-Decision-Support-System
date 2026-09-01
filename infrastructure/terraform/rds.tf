@@ -31,14 +31,16 @@ resource "aws_kms_key" "rds" {
 resource "aws_db_instance" "postgres" {
   identifier             = "cdss-postgres-${var.environment}"
   engine                 = "postgres"
-  engine_version         = "16.1"
-  instance_class         = "db.t4g.medium"
+  engine_version         = "16.9"
+  instance_class         = "db.t3.micro"
+
+
   allocated_storage      = 20
   max_allocated_storage  = 100
   storage_type           = "gp3"
   storage_encrypted      = true
   kms_key_id             = aws_kms_key.rds.arn
-  multi_az               = var.environment == "production" ? true : false
+  multi_az               = false
   db_name                = "cdss_db"
   username               = "cdss_user"
   password               = var.db_password
@@ -46,3 +48,4 @@ resource "aws_db_instance" "postgres" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   skip_final_snapshot    = true
 }
+

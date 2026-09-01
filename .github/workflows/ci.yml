@@ -2,9 +2,10 @@ name: CDSS CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, aws_migration ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, aws_migration ]
+
 
 jobs:
   backend-test:
