@@ -9,8 +9,12 @@ jobs:
   deploy:
     name: Build Docker Images & Deploy
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
+
       - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
