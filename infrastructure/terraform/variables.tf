@@ -29,3 +29,10 @@ variable "groq_api_key" {
   sensitive   = true
   default     = "gsk_placeholder_production_key"
 }
+
+variable "github_repository" {
+  description = "GitHub repository (owner/repo) allowed to assume OIDC deploy role"
+  type        = string
+  default     = "TheProgrammer400/Clinical-Decision-Support-System"
+}
+
