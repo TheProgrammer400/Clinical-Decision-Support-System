@@ -1,5 +1,6 @@
 resource "aws_secretsmanager_secret" "groq_key" {
-  name = "cdss/${var.environment}/groq_api_key"
+  name                    = "cdss/${var.environment}/groq_api_key"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "groq_key" {
@@ -8,7 +9,8 @@ resource "aws_secretsmanager_secret_version" "groq_key" {
 }
 
 resource "aws_secretsmanager_secret" "db_url" {
-  name = "cdss/${var.environment}/database_url"
+  name                    = "cdss/${var.environment}/database_url"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_url" {
