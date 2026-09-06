@@ -1,7 +1,6 @@
 resource "aws_s3_bucket" "model_artifacts" {
   bucket        = "cdss-model-artifacts-${var.environment}"
-  force_destroy = true
-
+  force_destroy = false
 
   tags = {
     Name = "cdss-model-artifacts-${var.environment}"

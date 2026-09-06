@@ -1,6 +1,6 @@
 resource "aws_s3_bucket" "frontend" {
   bucket        = "cdss-frontend-assets-${var.environment}"
-  force_destroy = true
+  force_destroy = false
 }
 
 # CloudFront is disabled for new AWS accounts until account verification by AWS Support.
