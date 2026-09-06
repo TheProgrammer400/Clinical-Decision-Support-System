@@ -26,7 +26,6 @@ jobs:
         with:
           aws-region: ap-south-1
           role-to-assume: arn:aws:iam::061179368899:role/CDSSGitHubDeployRole
-          audience: sts.amazonaws.com
 
 
 
