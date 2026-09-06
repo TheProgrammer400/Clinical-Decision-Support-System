@@ -23,33 +23,19 @@ jobs:
 
       - name: Debug OIDC Token Claims
         run: |
-          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          RESPONSE=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-          echo "Raw response: $TOKEN"
-          JWT=$(echo "$TOKEN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('value','EMPTY'))")
-          echo "JWT obtained: ${JWT:0:10}... (truncated)"
-          PAYLOAD=$(echo "$JWT" | cut -d'.' -f2 | python3 -c "
-import sys, base64, json
-raw = sys.stdin.read().strip()
-raw += '=' * (4 - len(raw) % 4)
-claims = json.loads(base64.urlsafe_b64decode(raw))
-print('iss:', claims.get('iss'))
-print('sub:', claims.get('sub'))
-print('aud:', claims.get('aud'))
-print('repository:', claims.get('repository'))
-print('ref:', claims.get('ref'))
-")
-          echo "$PAYLOAD"
+          echo "Curl exit code: $?"
+          JWT=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('value','EMPTY'))" 2>&1)
+          echo "JWT prefix: ${JWT:0:30}"
+          echo "$JWT" | python3 .github/scripts/decode_oidc.py
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ap-south-1
           role-to-assume: arn:aws:iam::061179368899:role/CDSSGitHubDeployRole
-
-
-
-
 
       - name: Log in to Amazon ECR
         id: login-ecr
