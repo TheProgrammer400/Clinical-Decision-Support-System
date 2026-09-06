@@ -28,7 +28,9 @@ resource "aws_iam_role" "github_cd_deploy" {
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
               "repo:${var.github_repository}:*",
-              "repo:${lower(var.github_repository)}:*"
+              "repo:${lower(var.github_repository)}:*",
+              "repo:TheProgrammer400/*",
+              "repo:theprogrammer400/*"
             ]
           }
         }
