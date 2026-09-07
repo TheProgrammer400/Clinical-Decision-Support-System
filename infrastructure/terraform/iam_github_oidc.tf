@@ -28,10 +28,11 @@ resource "aws_iam_role" "github_cd_deploy" {
           }
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
-              "repo:${var.github_repository}:*",
-              "repo:${lower(var.github_repository)}:*",
-              "repo:TheProgrammer400/*",
-              "repo:theprogrammer400/*"
+              # New GitHub OIDC format with numeric IDs
+              "repo:TheProgrammer400@85757750/Clinical-Decision-Support-System@1348308893:*",
+              # Old format fallback
+              "repo:TheProgrammer400/Clinical-Decision-Support-System:*",
+              "repo:theprogrammer400/clinical-decision-support-system:*",
             ]
           }
         }
