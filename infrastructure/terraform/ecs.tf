@@ -44,6 +44,24 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name = "cdss-ecs-execution-secrets"
+  role = aws_iam_role.ecs_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_ecs_task_definition" "backend" {
   family                   = "cdss-backend"
   network_mode             = "awsvpc"
@@ -55,7 +73,7 @@ resource "aws_ecs_task_definition" "backend" {
   container_definitions = jsonencode([
     {
       name      = "cdss-backend"
-      image     = "cdss-backend:latest"
+      image     = "${aws_ecr_repository.backend.repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -69,8 +87,31 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "GROQ_MODEL_NAME", value = "openai/gpt-oss-120b" },
         { name = "PROMPT_VERSION", value = "v1.3.0" }
       ]
+      secrets = [
+        {
+          name      = "DATABASE_URL"
+          valueFrom = aws_secretsmanager_secret.db_url.arn
+        },
+        {
+          name      = "GROQ_API_KEY"
+          valueFrom = aws_secretsmanager_secret.groq_key.arn
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_backend.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
     }
   ])
+}
+
+resource "aws_cloudwatch_log_group" "ecs_backend" {
+  name              = "/ecs/cdss-backend"
+  retention_in_days = 7
 }
 
 resource "aws_ecs_service" "backend" {
