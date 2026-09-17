@@ -122,7 +122,7 @@ export default function HomePage() {
             <Activity className="h-5 w-5 text-primary" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xl font-headline font-bold text-primary tracking-tight">Obsidian CDSS</span>
+            <span className="text-xl font-headline font-bold text-primary tracking-tight">CDSS</span>
             <span className="text-xs bg-surface-container-highest border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded font-mono">
               Groq v1.4
             </span>

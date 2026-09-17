@@ -454,7 +454,7 @@ export default function DoctorDashboardPage() {
 
           {/* Footer Bar matching screenshot */}
           <footer className="w-full pt-8 pb-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-on-surface-variant border-t border-outline-variant mt-auto">
-            <div>© 2026 Obsidian Clinical Systems. HIPAA Compliant.</div>
+            <div>© 2026 CDSS Clinical Systems. HIPAA Compliant.</div>
             <div className="flex gap-4 font-medium">
               <a href="#security" className="hover:text-primary transition-colors">Security</a>
               <a href="#support" className="hover:text-primary transition-colors">Support</a>

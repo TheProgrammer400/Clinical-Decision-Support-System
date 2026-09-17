@@ -4,7 +4,7 @@ import Providers from './providers';
 import Navbar from '@/components/Navbar';
 
 export const metadata = {
-  title: 'Obsidian CDSS — Clinical Decision Support System',
+  title: 'CDSS — Clinical Decision Support System',
   description: 'AI-assisted probabilistic differential diagnostic decision support system for clinicians.',
 };
 
@@ -31,9 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <footer className="w-full py-8 px-6 bg-surface-container-lowest border-t border-outline-variant text-center text-xs text-on-surface-variant">
               <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="flex flex-col text-left">
-                  <span className="text-sm font-headline font-bold text-on-surface">Obsidian CDSS</span>
+                  <span className="text-sm font-headline font-bold text-on-surface">CDSS</span>
                   <span className="text-[11px] text-on-surface-variant">
-                    © 2026 Obsidian Health. For clinical professional use only. Regulatory compliance: HIPAA, GDPR, SaMD Class II.
+                    © 2026 CDSS Health. For clinical professional use only. Regulatory compliance: HIPAA, GDPR, SaMD Class II.
                   </span>
                 </div>
                 <div className="text-[11px] text-on-surface-variant text-right">

@@ -49,7 +49,7 @@ export default function Navbar() {
               <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
                 <Activity className="h-6 w-6 text-primary" />
               </div>
-              <span className="font-headline font-bold text-on-surface">Obsidian CDSS <span className="text-xs font-mono font-normal text-on-surface-variant px-2 py-0.5 bg-surface-container-highest rounded-full border border-outline-variant">Groq v1.4</span></span>
+              <span className="font-headline font-bold text-on-surface">CDSS <span className="text-xs font-mono font-normal text-on-surface-variant px-2 py-0.5 bg-surface-container-highest rounded-full border border-outline-variant">Groq v1.4</span></span>
             </Link>
           </div>
 

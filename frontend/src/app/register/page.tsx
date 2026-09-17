@@ -88,7 +88,7 @@ export default function RegisterPage() {
               <Activity className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-2xl font-headline font-semibold tracking-tight text-on-surface">
-              Obsidian CDSS
+              CDSS
             </h1>
           </div>
 
@@ -334,7 +334,7 @@ export default function RegisterPage() {
         {/* Regulatory Compliance Footer */}
         <footer className="text-center">
           <p className="text-[11px] leading-relaxed text-on-surface-variant font-mono tracking-wide">
-            © 2026 Obsidian Health. For clinical professional use only.
+            © 2026 CDSS Health. For clinical professional use only.
             <br />
             Regulatory compliance: HIPAA, GDPR, SaMD Class II.
           </p>

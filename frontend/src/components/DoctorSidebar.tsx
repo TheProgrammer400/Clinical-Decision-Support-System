@@ -56,7 +56,7 @@ export default function DoctorSidebar() {
           </div>
           <div>
             <h1 className="text-lg font-headline font-bold text-on-surface tracking-tight leading-none">
-              Obsidian CDSS
+              CDSS
             </h1>
             <span className="text-[10px] font-mono text-on-surface-variant mt-1 inline-block">
               v2.4.0-Stable
@@ -92,7 +92,7 @@ export default function DoctorSidebar() {
           href="#help"
           onClick={(e) => {
             e.preventDefault();
-            alert('Obsidian CDSS Documentation & Help Center available in user portal.');
+            alert('CDSS Documentation & Help Center available in user portal.');
           }}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-surface-variant hover:text-on-surface transition-colors cursor-pointer"
         >

@@ -44,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center gap-3">
           <HeartPulse className="h-6 w-6 text-primary" />
           <span className="text-xl font-headline font-bold tracking-tighter text-on-surface">
-            Obsidian CDSS
+            CDSS
           </span>
           <span className="text-xs bg-surface-container-highest text-on-surface-variant px-2.5 py-0.5 rounded-full border border-outline-variant ml-1 font-mono">
             Groq v1.4
