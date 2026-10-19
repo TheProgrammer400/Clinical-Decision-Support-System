@@ -1,23 +1,24 @@
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+# MRI segmentation inference service.
+# The PyPI torch wheels bundle their own CUDA runtime libraries, so a slim Python base image is
+# sufficient; GPU access requires the NVIDIA container runtime on the host.
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
+# Model weights are not in the repository. Mount them at runtime (recommended) or place
+# them in models/ before building. The service refuses to start without them.
 COPY models/ ./models/
+
+RUN useradd --system --uid 10001 appuser && chown -R appuser /app
+USER appuser
 
 EXPOSE 8000
 

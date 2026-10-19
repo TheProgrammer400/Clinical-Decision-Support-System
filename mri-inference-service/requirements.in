@@ -1,0 +1,12 @@
+# Direct runtime dependencies (exact versions). Regenerate the lock file after editing:
+#   uv pip compile requirements.in -o requirements.txt --python-version 3.12 --python-platform x86_64-manylinux_2_28
+fastapi==0.148.0
+uvicorn[standard]==0.54.0
+torch==2.8.0
+torchvision==0.23.0
+pillow==13.0.0
+scipy==1.18.1
+numpy==2.5.4
+pydantic==2.14.1
+pydantic-settings==2.16.0
+python-multipart==0.0.32
