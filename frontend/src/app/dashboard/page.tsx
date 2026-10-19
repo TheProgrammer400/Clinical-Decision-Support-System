@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Cpu, FileText, Plus, RefreshCw } from 'lucide-react';
 import DoctorSidebar from '@/components/DoctorSidebar';
@@ -8,6 +8,7 @@ import { CaseStatusBadge, SeverityBadge } from '@/components/case/badges';
 import { apiClient } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/format';
 import { RequireAuth, useSession } from '@/lib/session';
+import { errorMessage, useResource } from '@/lib/use-resource';
 import type { CaseStats, CaseSummary } from '@/lib/types';
 
 export default function DoctorDashboardPage() {
@@ -20,29 +21,13 @@ export default function DoctorDashboardPage() {
 
 function Dashboard() {
   const { user } = useSession();
-  const [stats, setStats] = useState<CaseStats | null>(null);
-  const [recent, setRecent] = useState<CaseSummary[]>([]);
+  const resource = useResource(() => Promise.all([apiClient.getCaseStats(), apiClient.listCases(1, 20)]), 'dashboard');
+  const stats: CaseStats | null = resource.data?.[0] ?? null;
+  const recent: CaseSummary[] = resource.data?.[1].data ?? [];
+  const loading = resource.loading;
+  const error = errorMessage(resource.error, 'Dashboard data could not be loaded.');
+  const load = resource.reload;
   const [filter, setFilter] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [s, list] = await Promise.all([apiClient.getCaseStats(), apiClient.listCases(1, 20)]);
-      setStats(s);
-      setRecent(list.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Dashboard data could not be loaded.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   const q = filter.trim().toLowerCase();
   const visible = q ? recent.filter((c) => c.caseTextPreview.toLowerCase().includes(q) || c.id.startsWith(q)) : recent;

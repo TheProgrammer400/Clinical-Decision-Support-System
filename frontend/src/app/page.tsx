@@ -10,7 +10,6 @@ import {
   FileText,
   AlertTriangle,
   Search,
-  CheckCircle2,
   ChevronRight,
   Stethoscope,
   Terminal,
@@ -18,7 +17,6 @@ import {
   Gavel,
   MemoryStick,
   Sparkles,
-  Zap,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -490,7 +488,7 @@ export default function HomePage() {
               Strict Safety Separation
             </p>
             <p className="text-xs text-on-surface-variant italic leading-relaxed">
-              "Image segmentation provides quantitative and spatial information (<code className="text-primary font-mono">area_percent</code>, <code className="text-primary font-mono">visual_width_span_percent</code>). It does not determine tumor type, grade, or definitive diagnosis."
+              &ldquo;Image segmentation provides pixel-based measurements (<code className="text-primary font-mono">area_percent</code>, <code className="text-primary font-mono">sqrt_area_percent</code>). It does not determine tumour type, grade, or a diagnosis.&rdquo;
             </p>
           </div>
         </section>

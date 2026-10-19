@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Activity, AlertTriangle, ArrowLeft, Calendar, CheckCircle2, Download, FileText, HelpCircle, Printer, RefreshCw, ThumbsDown, ThumbsUp, User } from 'lucide-react';
@@ -12,6 +12,7 @@ import { SafetyFlagsNotice } from '@/components/case/SafetyFlagsNotice';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { ANALYSIS_STATUS_LABEL, formatDateTime } from '@/lib/format';
 import { RequireAuth } from '@/lib/session';
+import { useResource } from '@/lib/use-resource';
 import type { Analysis, CaseDetail, FeedbackRating } from '@/lib/types';
 
 const CONTEXT_LABELS: Record<string, Record<string, string>> = {
@@ -32,30 +33,23 @@ function CaseDetailContent() {
   const params = useParams();
   const caseId = params.id as string;
 
-  const [clinicalCase, setClinicalCase] = useState<CaseDetail | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const resource = useResource(() => apiClient.getCase(caseId), caseId);
+  const clinicalCase: CaseDetail | null = resource.data;
+  const loading = resource.loading;
+  const error = resource.error
+    ? resource.error instanceof ApiError && resource.error.status === 404
+      ? 'This case does not exist or you do not have access to it.'
+      : 'The case could not be loaded.'
+    : null;
+  // null = follow the latest analysis; otherwise the run the user picked.
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const selectedId = pickedId ?? clinicalCase?.analyses[0]?.id ?? null;
   const [reanalyzing, setReanalyzing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiClient.getCase(caseId);
-      setClinicalCase(data);
-      setSelectedId(data.analyses[0]?.id ?? null);
-    } catch (err) {
-      setError(err instanceof ApiError && err.status === 404 ? 'This case does not exist or you do not have access to it.' : 'The case could not be loaded.');
-    } finally {
-      setLoading(false);
-    }
-  }, [caseId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const load = async () => {
+    setPickedId(null);
+    await resource.reload();
+  };
 
   const handleReanalyze = async () => {
     setReanalyzing(true);
@@ -190,7 +184,7 @@ function CaseDetailContent() {
         </section>
 
         {clinicalCase.analyses.length > 1 && (
-          <AnalysisHistory analyses={clinicalCase.analyses} selectedId={selectedId} onSelect={setSelectedId} />
+          <AnalysisHistory analyses={clinicalCase.analyses} selectedId={selectedId} onSelect={setPickedId} />
         )}
 
         <AnalysisStatusNotice analysis={selected} caseStatus={clinicalCase.status} />
@@ -206,7 +200,7 @@ function CaseDetailContent() {
 
         <MriPanel caseId={clinicalCase.id} analyses={clinicalCase.mriAnalyses} />
 
-        {selected?.status === 'SUCCESS' && clinicalCase.canAct && !selected.isMock && <FeedbackBar analysisId={selected.id} />}
+        {selected?.status === 'SUCCESS' && clinicalCase.canAct && !selected.isMock && <FeedbackBar key={selected.id} analysisId={selected.id} />}
       </main>
     </Shell>
   );
@@ -257,12 +251,6 @@ function FeedbackBar({ analysisId }: { analysisId: string }) {
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSubmitted(false);
-    setComment('');
-    setError(null);
-  }, [analysisId]);
 
   const submit = async (rating: FeedbackRating) => {
     try {

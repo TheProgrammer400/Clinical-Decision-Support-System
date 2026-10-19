@@ -1,29 +1,14 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage, useResource } from '@/lib/use-resource';
 
 /** Loads admin data from the API with explicit loading/error state (no placeholder numbers). */
 export function useAdminData<T>(path: string) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setData(await apiClient.get<T>(path));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [path]);
-  useEffect(() => {
-    reload();
-  }, [reload]);
-  return { data, error, loading, reload };
+  const { data, error, loading, reload } = useResource(() => apiClient.get<T>(path), path);
+  return { data, error: errorMessage(error, 'Request failed'), loading, reload };
 }
 
 export function PageHeader({ icon, title, description, onRefresh, loading }: { icon: React.ReactNode; title: string; description: string; onRefresh?: () => void; loading?: boolean }) {

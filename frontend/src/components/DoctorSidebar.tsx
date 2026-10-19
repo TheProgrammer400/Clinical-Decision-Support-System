@@ -5,12 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity,
-  Plus,
   LayoutDashboard,
   Stethoscope,
   FileCheck,
-  History,
-  BookOpen,
   HelpCircle,
   LogOut,
 } from 'lucide-react';

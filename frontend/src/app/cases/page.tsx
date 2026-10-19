@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope, CheckCircle2 } from 'lucide-react';
+import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DoctorSidebar from '@/components/DoctorSidebar';
 import { CaseStatusBadge, SeverityBadge } from '@/components/case/badges';
 import { RequireAuth } from '@/lib/session';
+import { errorMessage, useResource } from '@/lib/use-resource';
 import type { CaseSummary, Paginated } from '@/lib/types';
 
 export default function CasesHistoryPage() {
@@ -18,28 +19,12 @@ export default function CasesHistoryPage() {
 }
 
 function CasesHistory() {
-  const [cases, setCases] = useState<CaseSummary[]>([]);
-  const [meta, setMeta] = useState<Paginated<CaseSummary>['meta'] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-
-  const fetchCases = async (currentPage = 1) => {
-    try {
-      setLoading(true);
-      const data = await apiClient.listCases(currentPage, 15);
-      setCases(data.data);
-      setMeta(data.meta);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load case history');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCases(page);
-  }, [page]);
+  const resource = useResource(() => apiClient.listCases(page, 15), String(page));
+  const cases: CaseSummary[] = resource.data?.data ?? [];
+  const meta: Paginated<CaseSummary>['meta'] | null = resource.data?.meta ?? null;
+  const loading = resource.loading;
+  const error = errorMessage(resource.error, 'Failed to load case history');
 
   return (
     <div className="flex min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary selection:text-on-primary">
@@ -83,7 +68,7 @@ function CasesHistory() {
           <Stethoscope className="h-12 w-12 text-on-surface-variant opacity-40 mx-auto" />
           <h3 className="text-lg font-bold text-on-surface">No Clinical Cases Found</h3>
           <p className="text-sm text-on-surface-variant max-w-sm mx-auto">
-            You haven't submitted any clinical case evaluations yet. Click below to evaluate your first case.
+            You have not submitted any clinical case evaluations yet. Click below to evaluate your first case.
           </p>
           <Link
             href="/cases/new"

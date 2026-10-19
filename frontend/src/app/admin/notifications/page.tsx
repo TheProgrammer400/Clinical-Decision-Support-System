@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Bell,
   CheckCircle2,
@@ -8,15 +8,13 @@ import {
   Clock,
   RefreshCw,
   Search,
-  Filter,
   AlertCircle,
-  UserCheck,
   Building,
   Mail,
   Calendar,
-  ShieldCheck,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage, useResource } from '@/lib/use-resource';
 
 interface RegistrationRequest {
   id: string;
@@ -29,9 +27,11 @@ interface RegistrationRequest {
 }
 
 export default function AdminNotificationsPage() {
-  const [requests, setRequests] = useState<RegistrationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const resource = useResource(() => apiClient.get<RegistrationRequest[]>('/admin/registration-requests'), 'registrations');
+  const requests: RegistrationRequest[] = resource.data ?? [];
+  const loading = resource.loading;
+  const [actionError, setError] = useState<string | null>(null);
+  const error = actionError ?? errorMessage(resource.error, 'Failed to fetch registration requests.');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
   const [searchQuery, setSearchQuery] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -49,22 +49,7 @@ export default function AdminNotificationsPage() {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const fetchRequests = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiClient.get<RegistrationRequest[]>('/admin/registration-requests');
-      setRequests(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch registration requests.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  const fetchRequests = resource.reload;
 
   const handleOpenConfirm = (type: 'APPROVE' | 'REJECT', req: RegistrationRequest) => {
     setConfirmModal({
@@ -245,7 +230,6 @@ export default function AdminNotificationsPage() {
           filteredRequests.map((req) => {
             const isPending = req.status === 'PENDING';
             const isApproved = req.status === 'APPROVED';
-            const isRejected = req.status === 'REJECTED';
 
             return (
               <div
