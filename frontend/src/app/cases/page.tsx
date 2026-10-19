@@ -5,10 +5,21 @@ import Link from 'next/link';
 import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DoctorSidebar from '@/components/DoctorSidebar';
+import { CaseStatusBadge, SeverityBadge } from '@/components/case/badges';
+import { RequireAuth } from '@/lib/session';
+import type { CaseSummary, Paginated } from '@/lib/types';
 
 export default function CasesHistoryPage() {
-  const [cases, setCases] = useState<any[]>([]);
-  const [meta, setMeta] = useState<any>(null);
+  return (
+    <RequireAuth>
+      <CasesHistory />
+    </RequireAuth>
+  );
+}
+
+function CasesHistory() {
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [meta, setMeta] = useState<Paginated<CaseSummary>['meta'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -19,8 +30,8 @@ export default function CasesHistoryPage() {
       const data = await apiClient.listCases(currentPage, 15);
       setCases(data.data);
       setMeta(data.meta);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load case history');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load case history');
     } finally {
       setLoading(false);
     }
@@ -64,7 +75,7 @@ export default function CasesHistoryPage() {
 
       {loading ? (
         <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-3">
-          <Activity className="h-8 w-8 text-primary animate-spin" />
+          <Activity className="h-8 w-8 text-primary animate-spin" aria-hidden="true" />
           <div className="text-on-surface-variant text-sm">Loading case history...</div>
         </div>
       ) : cases.length === 0 ? (
@@ -85,8 +96,8 @@ export default function CasesHistoryPage() {
       ) : (
         <div className="space-y-3">
           {cases.map((c) => {
-            const latestAnalysis = c.analyses?.[0];
-            const hasMri = c.mriAnalyses && c.mriAnalyses.length > 0;
+            const latestAnalysis = c.latestAnalysis;
+            const hasMri = c.mriCount > 0;
 
             return (
               <Link
@@ -100,25 +111,16 @@ export default function CasesHistoryPage() {
                       <span className="text-xs font-mono text-on-surface-variant bg-surface-container-lowest px-2 py-0.5 rounded border border-outline-variant">
                         #{c.id.slice(0, 8)}
                       </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
-                          c.status === 'COMPLETED'
-                            ? 'bg-tertiary-fixed/10 text-tertiary border border-tertiary/20'
-                            : c.status === 'FAILED'
-                            ? 'bg-error-container/40 text-error border border-error/30'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                      <CaseStatusBadge status={c.status} />
+                      <SeverityBadge severity={latestAnalysis?.alertSeverity ?? null} isMock={latestAnalysis?.isMock} />
                       {hasMri && (
                         <span className="text-xs px-2 py-0.5 rounded font-mono bg-primary-fixed/10 text-primary border border-primary/20">
-                          MRI GPU
+                          {c.mriCount} MRI image{c.mriCount === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-on-surface truncate font-medium">
-                      {c.caseText}
+                      {c.caseTextPreview}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-on-surface-variant pt-0.5">
                       <span className="flex items-center gap-1">

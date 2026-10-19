@@ -1,62 +1,48 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Activity, RefreshCw } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import React from 'react';
+import { Activity } from 'lucide-react';
+import { Card, LoadState, ms, PageHeader, StatusPill, useAdminData } from '@/components/admin/ui';
+import { formatDateTime } from '@/lib/format';
+import type { SystemHealth } from '@/lib/admin-types';
 
-export default function AdminSystemHealthPage() {
-  const [health, setHealth] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchHealth = async () => {
-    try {
-      setLoading(true);
-      const res = await apiClient.getAdminSystemHealth();
-      setHealth(res);
-    } catch {
-      alert('Failed to load system health');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHealth();
-  }, []);
-
+export default function SystemHealthPage() {
+  const { data, error, loading, reload } = useAdminData<SystemHealth>('/admin/system-health');
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between p-6 glass-panel rounded-3xl border border-purple-500/30">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center space-x-2">
-            <Activity className="h-6 w-6 text-emerald-400" />
-            <span>Infrastructure & System Health</span>
-          </h1>
-          <p className="text-sm text-slate-400">Live operational status of backend services, database, and inference worker.</p>
-        </div>
-        <button onClick={fetchHealth} className="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-xl border border-emerald-500/30">
-          <RefreshCw className="h-4 w-4" />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="p-12 text-center text-slate-400">Running Health Diagnostics...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {health &&
-            Object.entries(health).map(([key, item]: any) => (
-              <div key={key} className="p-5 glass-panel rounded-2xl border border-slate-800 flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="font-bold text-slate-200">{item.name}</div>
-                  <div className="text-xs text-slate-500 font-mono">Latency: {item.latencyMs}ms</div>
-                </div>
-                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold text-xs">
-                  ● {item.status}
-                </span>
-              </div>
-            ))}
-        </div>
-      )}
+      <PageHeader icon={<Activity className="h-6 w-6 text-primary" />} title="System health" description="Live probes run when this page loads." onRefresh={reload} loading={loading} />
+      <LoadState loading={loading && !data} error={error}>
+        {data && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {data.components.map((c) => (
+                <Card key={c.name}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-sm">{c.name}</span>
+                    <StatusPill status={c.status} />
+                  </div>
+                  <p className="text-xs text-on-surface-variant">Probe latency: {ms(c.latencyMs)}</p>
+                  {c.detail && <p className="text-xs text-on-surface-variant">{c.detail}</p>}
+                </Card>
+              ))}
+            </div>
+            <Card title="Inference device (reported by the service)">
+              <p className="text-xs">
+                Device: {data.inference.device ?? 'unknown'} · GPU: {data.inference.gpuName ?? (data.inference.cudaAvailable === false ? 'none (CPU)' : 'unknown')} · Model version:{' '}
+                {data.inference.modelVersion ?? 'unknown'}
+              </p>
+              <p className="text-[11px] text-on-surface-variant">GPU utilisation is not measured by this system.</p>
+            </Card>
+            <Card title="Audit log integrity">
+              <p className="text-xs">
+                Failed audit writes since server start: <strong>{data.auditWriteFailures}</strong>
+                {data.lastAuditFailureAt ? ` (last at ${formatDateTime(data.lastAuditFailureAt)})` : ''}
+              </p>
+            </Card>
+            <p className="text-[11px] text-on-surface-variant">Checked {formatDateTime(data.checkedAt)}</p>
+          </>
+        )}
+      </LoadState>
     </div>
   );
 }

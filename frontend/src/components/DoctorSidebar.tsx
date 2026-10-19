@@ -14,14 +14,15 @@ import {
   HelpCircle,
   LogOut,
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { useSession } from '@/lib/session';
 
 export default function DoctorSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut } = useSession();
 
   const handleLogout = async () => {
-    await apiClient.logout().catch(() => null);
+    await signOut();
     router.push('/login');
   };
 
@@ -59,7 +60,7 @@ export default function DoctorSidebar() {
               CDSS
             </h1>
             <span className="text-[10px] font-mono text-on-surface-variant mt-1 inline-block">
-              v2.4.0-Stable
+              Decision support
             </span>
           </div>
         </div>
@@ -88,17 +89,13 @@ export default function DoctorSidebar() {
 
       {/* Sidebar Footer Menu */}
       <div className="p-3 border-t border-outline-variant space-y-1">
-        <a
-          href="#help"
-          onClick={(e) => {
-            e.preventDefault();
-            alert('CDSS Documentation & Help Center available in user portal.');
-          }}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+        <Link
+          href="/account/security"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-surface-variant hover:text-on-surface transition-colors"
         >
-          <HelpCircle className="h-4 w-4 text-on-surface-variant" />
-          <span>Help Center</span>
-        </a>
+          <HelpCircle className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />
+          <span>Account security</span>
+        </Link>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error-container/30 transition-colors"

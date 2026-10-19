@@ -124,7 +124,7 @@ export default function HomePage() {
           <div className="flex items-baseline gap-2">
             <span className="text-xl font-headline font-bold text-primary tracking-tight">CDSS</span>
             <span className="text-xs bg-surface-container-highest border border-outline-variant text-on-surface-variant px-1.5 py-0.5 rounded font-mono">
-              Groq v1.4
+              Decision support
             </span>
           </div>
         </div>
@@ -241,11 +241,11 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <Terminal className="h-4 w-4 text-primary" />
                 <span className="text-xs font-bold text-on-surface tracking-widest uppercase">
-                  CDSS Interface Preview
+                  Illustrative example (synthetic)
                 </span>
               </div>
               <span className="text-[10px] bg-surface-container-highest border border-outline-variant text-primary px-2 py-0.5 rounded font-mono">
-                Groq LLM v1.4
+                Not a real patient
               </span>
             </div>
 
@@ -268,20 +268,20 @@ export default function HomePage() {
               <div className="bg-surface-container-lowest border border-outline-variant rounded p-3">
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="font-mono text-on-surface">High-Grade Glioma / Glioblastoma</span>
-                  <span className="text-primary font-bold">85% Likelihood</span>
+                  <span className="text-primary font-bold">Likelihood: high</span>
                 </div>
                 <div className="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-primary h-1.5 rounded-full" style={{ width: '85%' }}></div>
+                  <div className="bg-primary h-1.5 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
 
               <div className="bg-surface-container-lowest border border-outline-variant rounded p-3">
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="font-mono text-on-surface">Brain Metastasis (Solitary)</span>
-                  <span className="text-tertiary font-bold">42% Likelihood</span>
+                  <span className="text-tertiary font-bold">Likelihood: moderate</span>
                 </div>
                 <div className="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-tertiary h-1.5 rounded-full" style={{ width: '42%' }}></div>
+                  <div className="bg-tertiary h-1.5 rounded-full" style={{ width: '66%' }}></div>
                 </div>
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function HomePage() {
             <div className="bg-[#3b1111]/40 border border-error/40 rounded p-3 flex gap-2.5 items-start">
               <AlertTriangle className="h-4 w-4 text-error flex-shrink-0 mt-0.5" />
               <p className="text-xs text-on-error-container leading-normal">
-                <strong className="font-bold text-error">Red Flag:</strong> Elevated intracranial pressure symptoms detected.
+                <strong className="font-bold text-error">Red flag:</strong> symptoms consistent with raised intracranial pressure require urgent evaluation.
               </p>
             </div>
 
@@ -307,11 +307,9 @@ export default function HomePage() {
             {/* Status Bar */}
             <div className="flex justify-between items-center text-[10px] text-on-surface-variant font-mono pt-3 border-t border-outline-variant">
               <div className="flex items-center gap-2">
-                <span>Status:</span>
-                <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
-                <span className="text-tertiary font-semibold">GPU Worker Active</span>
+                <span>Likelihoods are qualitative (high / moderate / low).</span>
               </div>
-              <span>U-Net: unet_v1.2.0</span>
+              <span>Synthetic example</span>
             </div>
           </div>
         </section>
@@ -349,7 +347,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-bold text-on-surface">AI-Assisted Analysis</h3>
               </div>
               <p className="text-sm text-on-surface-variant leading-relaxed">
-                The system analyzes the provided information using Groq LLM reasoning and optional PyTorch U-Net image findings to generate structured clinical decision support.
+                The system sends the information you enter, plus optional automated image measurements, to a large language model and validates the structured output before showing it.
               </p>
             </div>
 
@@ -442,7 +440,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-base font-bold mb-2 text-on-surface">MRI-Assisted Analysis</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Integrates image-derived PyTorch U-Net segmentation metrics when available, while strictly separating quantitative measurement from final diagnosis.
+                Includes automated 2D segmentation measurements when images are attached, clearly separated from clinician-observed findings. The measurements are pixel ratios, not physical sizes, and are not clinically validated.
               </p>
             </div>
           </div>
@@ -460,13 +458,13 @@ export default function HomePage() {
           <div className="flex flex-col items-center gap-3 relative z-10">
             <div className="inline-flex items-center gap-1.5 bg-surface-container-lowest border border-outline-variant rounded-full px-3 py-1">
               <MemoryStick className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[10px] font-mono text-primary">PyTorch U-Net GPU Pipeline</span>
+              <span className="text-[10px] font-mono text-primary">Automated segmentation (PyTorch)</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-headline font-bold text-on-surface">
               Optional MRI Workflow
             </h2>
             <p className="text-sm text-on-surface-variant max-w-xl leading-relaxed">
-              Quantitative segmentation features are extracted and passed as objective evidence to the reasoning engine.
+              Pixel-based segmentation measurements are computed and passed to the language model as automated, unvalidated supporting information.
             </p>
           </div>
 
@@ -478,7 +476,7 @@ export default function HomePage() {
             <ChevronRight className="h-5 w-5 text-outline hidden md:block" />
             <ChevronRight className="h-5 w-5 text-outline md:hidden rotate-90" />
             <div className="bg-primary/10 border border-primary/30 rounded py-3 px-6 w-full md:w-auto text-sm font-mono text-primary shadow-[0_0_15px_rgba(167,139,250,0.1)]">
-              MRI Analysis (U-Net)
+              Image segmentation
             </div>
             <ChevronRight className="h-5 w-5 text-outline hidden md:block" />
             <ChevronRight className="h-5 w-5 text-outline md:hidden rotate-90" />
