@@ -33,7 +33,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://cdss_test:cdss_test@localhost:5432/cdss_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -69,7 +69,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -94,7 +94,7 @@ jobs:
       run:
         working-directory: mri-inference-service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -111,6 +111,6 @@ jobs:
     name: Docker image builds (backend, frontend)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t cdss-backend:ci ./backend
       - run: docker build -t cdss-frontend:ci ./frontend
