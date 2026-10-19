@@ -1,81 +1,67 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Activity, Clock, User, Server } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import React, { useState } from 'react';
+import { ShieldAlert } from 'lucide-react';
+import { Card, LoadState, PageHeader, useAdminData } from '@/components/admin/ui';
+import { formatDateTime } from '@/lib/format';
+import type { AuditEntry } from '@/lib/admin-types';
+import type { Paginated } from '@/lib/types';
 
 export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .getAuditLogs(1, 50)
-      .then((data) => setLogs(data.data))
-      .catch((err) => setError(err.message || 'Access denied or failed to load audit logs'))
-      .finally(() => setLoading(false));
-  }, []);
-
+  const [page, setPage] = useState(1);
+  const { data, error, loading, reload } = useAdminData<Paginated<AuditEntry>>(`/admin/audit-logs?page=${page}&limit=50`);
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100 flex items-center space-x-2">
-          <ShieldAlert className="h-7 w-7 text-purple-400" />
-          <span>System Audit Trail Log</span>
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Append-only compliance audit trail capturing system events, authentication, and access records (PHI free).
-        </p>
-      </div>
-
-      {error ? (
-        <div className="p-6 glass-panel rounded-2xl border border-red-500/30 text-center text-red-400 text-sm">
-          {error}
-        </div>
-      ) : loading ? (
-        <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-3">
-          <Activity className="h-8 w-8 text-purple-400 animate-spin" />
-          <div className="text-slate-400 text-sm">Loading audit events...</div>
-        </div>
-      ) : (
-        <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 uppercase font-semibold border-b border-slate-800">
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        icon={<ShieldAlert className="h-6 w-6 text-primary" />}
+        title="Audit trail"
+        description="Security and clinical access events. Rows cannot be modified or deleted through the database's normal write path. Clinical text is never logged."
+        onRefresh={reload}
+        loading={loading}
+      />
+      <LoadState loading={loading && !data} error={error}>
+        {data && (
+          <Card>
+            <table className="w-full text-xs">
+              <thead className="text-left text-on-surface-variant">
                 <tr>
-                  <th className="px-4 py-3">Timestamp</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Actor</th>
-                  <th className="px-4 py-3">Resource</th>
-                  <th className="px-4 py-3">IP Address</th>
-                  <th className="px-4 py-3">Metadata</th>
+                  <th className="py-2">Time</th>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Resource</th>
+                  <th>IP</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-900/40">
-                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString()}
+              <tbody className="divide-y divide-outline-variant">
+                {data.data.map((l) => (
+                  <tr key={l.id}>
+                    <td className="py-2 whitespace-nowrap">{formatDateTime(l.createdAt)}</td>
+                    <td className="font-mono text-primary">{l.action}</td>
+                    <td>{l.actorUser?.email ?? 'system / anonymous'}</td>
+                    <td className="font-mono">
+                      {l.resourceType}:{l.resourceId.slice(0, 8)}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-purple-300">{log.action}</td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {log.actorUser ? log.actorUser.email : 'system'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {log.resourceType}:{log.resourceId.slice(0, 8)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{log.ipAddress || 'internal'}</td>
-                    <td className="px-4 py-3 text-slate-400 text-[11px] truncate max-w-xs">
-                      {JSON.stringify(log.metadata)}
-                    </td>
+                    <td className="font-mono">{l.ipAddress ?? ''}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
+            <div className="flex justify-between items-center text-xs text-on-surface-variant pt-3">
+              <span>
+                Page {data.meta.page} of {Math.max(1, data.meta.totalPages)} ({data.meta.total} events)
+              </span>
+              <span className="flex gap-2">
+                <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1 border border-outline-variant rounded disabled:opacity-40">
+                  Previous
+                </button>
+                <button disabled={page >= data.meta.totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1 border border-outline-variant rounded disabled:opacity-40">
+                  Next
+                </button>
+              </span>
+            </div>
+          </Card>
+        )}
+      </LoadState>
     </div>
   );
 }

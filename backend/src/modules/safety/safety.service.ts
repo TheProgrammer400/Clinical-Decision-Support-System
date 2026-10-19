@@ -1,84 +1,116 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
-import { ClinicalResponseSchema, ClinicalAnalysisResponse } from './dto/clinical-response.schema';
+import { Injectable, Logger } from '@nestjs/common';
+import { ClinicalAnalysisResponse, ClinicalResponseSchema } from './dto/clinical-response.schema';
 
 export const SERVER_FIXED_DISCLAIMER =
   'AI-GENERATED CLINICAL DECISION SUPPORT — NOT A DEFINITIVE DIAGNOSIS. THIS SYSTEM SUPPORTS BUT DOES NOT REPLACE INDEPENDENT CLINICAL JUDGMENT BY A LICENSED HEALTHCARE PROFESSIONAL.';
+
+/** Safety observations persisted with an analysis and displayed to the clinician. */
+export type SafetyFlag =
+  | 'possible_prompt_injection'
+  | 'dosage_content'
+  | 'imaging_reference_without_imaging'
+  | 'severity_inferred';
+
+export const SAFETY_FLAG_DESCRIPTIONS: Record<SafetyFlag, string> = {
+  possible_prompt_injection:
+    'The case text contains phrasing that resembles an attempt to override the assistant instructions. Review the output with extra care.',
+  dosage_content:
+    'The output contains specific dosing or administration details, which this system is instructed not to provide. Verify independently; do not act on them.',
+  imaging_reference_without_imaging:
+    'The output refers to image segmentation results although no MRI measurements were supplied for this case.',
+  severity_inferred:
+    'The model did not return a valid alert severity; the displayed severity was derived from the listed red flags.',
+};
+
+export class OutputValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OutputValidationError';
+  }
+}
+
+export interface ValidatedAnalysis {
+  data: ClinicalAnalysisResponse;
+  flags: SafetyFlag[];
+}
+
+const DOSAGE_PATTERN = /\b\d+(\.\d+)?\s*(mg|g|mcg|µg|ug|ml|mL|units?|iu|IU|mg\/kg|mcg\/kg)\b(\s*(\/|per)\s*(day|kg|h|hr|dose))?(\s*(po|iv|im|sc|sq|q\d+h|bid|tid|qid|daily|prn|stat|od|bd))?/i;
+const IMAGING_PATTERN = /\b(u-?net|segment(ed|ation)|segmented_pixels|area_percent|sqrt_area_percent|tumou?r_pixels|foreground_pixels)\b/i;
 
 @Injectable()
 export class SafetyService {
   private readonly logger = new Logger(SafetyService.name);
 
   /**
-   * Validates raw JSON content against the clinical Zod schema,
-   * performs safety checks, and injects the server-controlled fixed disclaimer.
+   * Parses and validates model output against the clinical schema, applies server-side
+   * safety rules and returns explicit flags. Throws OutputValidationError for malformed or
+   * incomplete output. It never fills in missing clinical content.
    */
-  validateAndSanitize(rawJsonContent: string): ClinicalAnalysisResponse {
-    let parsed: any;
+  validateAndSanitize(rawJsonContent: string, context: { hasImaging: boolean } = { hasImaging: false }): ValidatedAnalysis {
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(rawJsonContent);
-    } catch (e) {
-      this.logger.error(`JSON Parse Error: ${e.message}`);
-      throw new UnprocessableEntityException('LLM output could not be parsed as valid JSON');
+      parsed = JSON.parse(stripCodeFence(rawJsonContent));
+    } catch {
+      throw new OutputValidationError('LLM output is not valid JSON');
     }
 
-    const validationResult = ClinicalResponseSchema.safeParse(parsed);
-    if (!validationResult.success) {
-      const issueSummary = validationResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-      this.logger.warn(`Schema Validation Failed: ${issueSummary}`);
-      throw new UnprocessableEntityException(`LLM output schema validation failed: ${issueSummary}`);
+    const result = ClinicalResponseSchema.safeParse(parsed);
+    if (!result.success) {
+      const summary = result.error.issues
+        .slice(0, 10)
+        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join('; ');
+      throw new OutputValidationError(`LLM output failed schema validation: ${summary}`);
     }
 
-    const validatedData = validationResult.data;
+    const data = result.data;
+    const flags: SafetyFlag[] = [];
+    const serialized = JSON.stringify(data);
 
-    // Safety Rule 1: Ensure mandatory safety fields exist (even if empty arrays/strings)
-    if (!Array.isArray(validatedData.red_flags)) {
-      validatedData.red_flags = [];
+    if (DOSAGE_PATTERN.test(serialized)) {
+      flags.push('dosage_content');
+      this.logger.warn('LLM output contains dosing details; flagged for the clinician.');
     }
-    if (!Array.isArray(validatedData.missing_information)) {
-      validatedData.missing_information = [];
-    }
-    if (!validatedData.uncertainty_notes) {
-      validatedData.uncertainty_notes = 'Qualitative clinical decision support based on presented text.';
-    }
-
-    // Safety Rule 2: Unsafe drug dosage pattern check (log warnings if detailed prescribing patterns found)
-    const unsafeDosageRegex = /\b\d+(\.\d+)?\s*(mg|g|mcg|ml|units)\s*(po|iv|im|q\d+h|bid|tid|qid|daily|prn)\b/i;
-    const jsonString = JSON.stringify(validatedData);
-    if (unsafeDosageRegex.test(jsonString)) {
-      this.logger.warn('LLM output contains explicit drug dosage recommendations. Prescribing guidelines defer strictly to physician.');
+    if (!context.hasImaging && IMAGING_PATTERN.test(serialized)) {
+      flags.push('imaging_reference_without_imaging');
     }
 
-    // Safety Rule 3: Server ALWAYS overwrites the disclaimer field
-    validatedData.disclaimer = SERVER_FIXED_DISCLAIMER;
+    // The disclaimer is always server-controlled.
+    data.disclaimer = SERVER_FIXED_DISCLAIMER;
 
-    // Safety Rule 4: Standardize clinical alert object with safe severity fallbacks
-    if (!validatedData.alert || !['critical', 'moderate', 'low'].includes(validatedData.alert.severity)) {
-      const redFlagItems = validatedData.red_flags || [];
-      if (redFlagItems.length > 0) {
-        validatedData.alert = {
-          severity: 'moderate',
-          title: 'MODERATE — CLINICAL CONCERNS TO MONITOR',
-          summary: 'Clinically important concerns identified that warrant timely evaluation.',
-          items: redFlagItems,
-        };
-      } else {
-        validatedData.alert = {
-          severity: 'low',
-          title: 'LOW — NO IMMEDIATE RED FLAGS IDENTIFIED',
-          summary: 'No immediate emergency features identified from the information provided.',
-          items: ['No immediate emergency features identified from the information provided.'],
-        };
-      }
+    if (!data.alert) {
+      // A missing alert is inferred from the model's own red flags and labelled as inferred.
+      flags.push('severity_inferred');
+      data.alert =
+        data.red_flags.length > 0
+          ? {
+              severity: 'moderate',
+              title: 'MODERATE — CLINICAL CONCERNS TO MONITOR',
+              summary: 'Severity inferred from the red flags listed by the model.',
+              items: [...data.red_flags],
+            }
+          : {
+              severity: 'low',
+              title: 'LOW — NO IMMEDIATE RED FLAGS LISTED',
+              summary: 'The model listed no red flags. This is not a confirmation that none exist.',
+              items: [],
+            };
     } else {
-      // Ensure alert.items and red_flags remain in sync
-      if ((!validatedData.alert.items || validatedData.alert.items.length === 0) && validatedData.red_flags.length > 0) {
-        validatedData.alert.items = [...validatedData.red_flags];
+      if (data.alert.items.length === 0 && data.red_flags.length > 0) {
+        data.alert.items = [...data.red_flags];
       }
-      if (validatedData.red_flags.length === 0 && validatedData.alert.items && validatedData.alert.items.length > 0) {
-        validatedData.red_flags = [...validatedData.alert.items];
+      if (data.red_flags.length === 0 && data.alert.items.length > 0) {
+        data.red_flags = [...data.alert.items];
       }
     }
 
-    return validatedData;
+    return { data, flags };
   }
+}
+
+/** Some models wrap JSON in a markdown fence despite instructions. */
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const match = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
+  return match ? match[1] : trimmed;
 }

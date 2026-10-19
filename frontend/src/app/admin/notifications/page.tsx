@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Bell,
   CheckCircle2,
@@ -8,30 +8,30 @@ import {
   Clock,
   RefreshCw,
   Search,
-  Filter,
   AlertCircle,
-  UserCheck,
   Building,
   Mail,
   Calendar,
-  ShieldCheck,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage, useResource } from '@/lib/use-resource';
 
 interface RegistrationRequest {
   id: string;
   fullName: string;
   email: string;
   role: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   createdAt: string;
-  organizationName: string;
+  organizationName: string | null;
 }
 
 export default function AdminNotificationsPage() {
-  const [requests, setRequests] = useState<RegistrationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const resource = useResource(() => apiClient.get<RegistrationRequest[]>('/admin/registration-requests'), 'registrations');
+  const requests: RegistrationRequest[] = resource.data ?? [];
+  const loading = resource.loading;
+  const [actionError, setError] = useState<string | null>(null);
+  const error = actionError ?? errorMessage(resource.error, 'Failed to fetch registration requests.');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
   const [searchQuery, setSearchQuery] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -49,22 +49,7 @@ export default function AdminNotificationsPage() {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const fetchRequests = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiClient.getRegistrationRequests();
-      setRequests(data || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch registration requests.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  const fetchRequests = resource.reload;
 
   const handleOpenConfirm = (type: 'APPROVE' | 'REJECT', req: RegistrationRequest) => {
     setConfirmModal({
@@ -91,19 +76,19 @@ export default function AdminNotificationsPage() {
       setError(null);
 
       if (type === 'APPROVE') {
-        const res = await apiClient.approveRegistrationRequest(request.id);
-        setSuccessMessage(res.message || 'Registration request approved. Account is now active.');
+        await apiClient.patch(`/admin/registration-requests/${request.id}/approve`);
+        setSuccessMessage(`Approved ${request.email}. The account can now sign in.`);
       } else {
-        const res = await apiClient.rejectRegistrationRequest(request.id);
-        setSuccessMessage(res.message || 'Registration request rejected.');
+        await apiClient.patch(`/admin/registration-requests/${request.id}/reject`);
+        setSuccessMessage(`Rejected the request from ${request.email}.`);
       }
 
       handleCloseConfirm();
       await fetchRequests();
 
       setTimeout(() => setSuccessMessage(null), 5000);
-    } catch (err: any) {
-      setError(err.message || `Failed to ${type.toLowerCase()} request.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${type.toLowerCase()} request.`);
     } finally {
       setProcessingId(null);
     }
@@ -114,7 +99,7 @@ export default function AdminNotificationsPage() {
     const matchesSearch =
       req.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.organizationName.toLowerCase().includes(searchQuery.toLowerCase());
+      (req.organizationName ?? '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
@@ -195,7 +180,7 @@ export default function AdminNotificationsPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`px-4 py-2 transition-colors border-r border-outline-variant last:border-r-0 flex items-center gap-2 ${
                 activeTab === tab.id
                   ? 'bg-primary/20 text-primary font-semibold'
@@ -245,7 +230,6 @@ export default function AdminNotificationsPage() {
           filteredRequests.map((req) => {
             const isPending = req.status === 'PENDING';
             const isApproved = req.status === 'APPROVED';
-            const isRejected = req.status === 'REJECTED';
 
             return (
               <div
@@ -308,7 +292,7 @@ export default function AdminNotificationsPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Building className="h-3.5 w-3.5 text-on-surface-variant" />
-                        <span>{req.organizationName}</span>
+                        <span>{req.organizationName ?? 'No organization'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5 text-on-surface-variant" />

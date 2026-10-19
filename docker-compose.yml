@@ -1,14 +1,21 @@
+# Local development stack. Not a production deployment.
+#
+#   docker compose up -d --build
+#   docker compose exec backend node dist/database/seed.js   # optional demo accounts
+#
+# Without GROQ_API_KEY the backend runs with the explicitly labelled mock LLM.
+# The MRI service needs model weights at ./mri-inference-service/models/unet.pth.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: cdss-postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: cdss_user
-      POSTGRES_PASSWORD: cdss_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cdss_password}
       POSTGRES_DB: cdss_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,25 +27,34 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
     container_name: cdss-backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "4000:4000"
     environment:
       PORT: 4000
       NODE_ENV: development
-      DATABASE_URL: postgresql://cdss_user:cdss_password@postgres:5432/cdss_db?schema=public
-      JWT_ACCESS_SECRET: dev_jwt_access_secret_key_change_in_production_12345
-      JWT_REFRESH_SECRET: dev_jwt_refresh_secret_key_change_in_production_67890
+      DATABASE_URL: postgresql://cdss_user:${POSTGRES_PASSWORD:-cdss_password}@postgres:5432/cdss_db?schema=public
+      # Development-only value; any deployment must set its own random secret (>= 32 chars).
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-development-only-jwt-secret-change-me}
       JWT_ACCESS_TTL: 900
-      JWT_REFRESH_TTL: 1209600
-      GROQ_API_KEY: ${GROQ_API_KEY:-gsk_mock_key_for_dev_testing}
+      REFRESH_TOKEN_TTL: 1209600
+      CORS_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: "false"
+      # Set GROQ_API_KEY and LLM_MOCK=false to use the real model.
+      LLM_MOCK: ${LLM_MOCK:-true}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL_NAME: openai/gpt-oss-120b
       GROQ_REQUEST_TIMEOUT_MS: 60000
-      PROMPT_VERSION: v1.4.0
-      LOG_LEVEL: debug
       MRI_INFERENCE_SERVICE_URL: http://mri-inference:8000
+      MRI_INFERENCE_TOKEN: ${MRI_INFERENCE_TOKEN:-local-dev-inference-token}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      ARTIFACT_STORAGE_DIR: uploads/mri
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_DOCTOR_PASSWORD: ${SEED_DOCTOR_PASSWORD:-}
+      LOG_LEVEL: debug
+    volumes:
+      - mri_artifacts:/app/uploads/mri
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,29 +62,33 @@ services:
   mri-inference:
     build:
       context: ./mri-inference-service
-      dockerfile: Dockerfile
     container_name: cdss-mri-inference
-    restart: always
+    restart: unless-stopped
+    # Only reachable from the backend container (and from localhost for debugging).
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       MODEL_PATH: models/unet.pth
       MODEL_VERSION: unet_v1.2.0
       MAX_CONCURRENT_INFERENCE: 1
-      ALLOW_CPU_FALLBACK: "false"
+      # Development convenience: run on CPU when no GPU is available.
+      ALLOW_CPU_FALLBACK: ${ALLOW_CPU_FALLBACK:-true}
+      INFERENCE_TOKEN: ${MRI_INFERENCE_TOKEN:-local-dev-inference-token}
+    volumes:
+      - ./mri-inference-service/models:/app/models:ro
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
     container_name: cdss-frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+  mri_artifacts:

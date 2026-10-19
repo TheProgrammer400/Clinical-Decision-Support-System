@@ -18,10 +18,12 @@ enum AccountStatus {
   PENDING
   APPROVED
   REJECTED
+  SUSPENDED
 }
 
 enum CaseStatus {
   PENDING
+  ANALYZING
   COMPLETED
   FAILED
 }
@@ -49,43 +51,93 @@ model Organization {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  organizationId String?         @map("organization_id")
-  email          String          @unique
-  passwordHash   String          @map("password_hash")
-  role           Role            @default(DOCTOR)
-  accountStatus  AccountStatus   @default(APPROVED) @map("account_status")
-  fullName       String          @map("full_name")
-  mfaEnabled     Boolean         @default(false) @map("mfa_enabled")
-  refreshTokenVersion Int        @default(1) @map("refresh_token_version")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  lastLoginAt    DateTime?       @map("last_login_at")
+  id                  String        @id @default(uuid())
+  organizationId      String?       @map("organization_id")
+  email               String        @unique
+  passwordHash        String        @map("password_hash")
+  role                Role          @default(DOCTOR)
+  accountStatus       AccountStatus @default(APPROVED) @map("account_status")
+  fullName            String        @map("full_name")
+  mfaEnabled          Boolean       @default(false) @map("mfa_enabled")
+  // AES-256-GCM encrypted TOTP secret (iv:tag:ciphertext, base64). Null when MFA is not enrolled.
+  mfaSecretEnc        String?       @map("mfa_secret_enc")
+  // Last accepted TOTP time step; codes at or before it are rejected (replay protection).
+  mfaLastUsedStep     Int?          @map("mfa_last_used_step")
+  // Monotonic session generation. Incremented on logout, password change and suspension;
+  // access tokens carrying an older value are rejected. Never decremented.
+  refreshTokenVersion Int           @default(1) @map("refresh_token_version")
+  mustChangePassword  Boolean       @default(false) @map("must_change_password")
+  passwordChangedAt   DateTime?     @map("password_changed_at")
+  failedLoginCount    Int           @default(0) @map("failed_login_count")
+  lockedUntil         DateTime?     @map("locked_until")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  lastLoginAt         DateTime?     @map("last_login_at")
 
-  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  clinicalCases  ClinicalCase[]
-  doctorFeedback DoctorFeedback[]
-  auditLogs      AuditLog[]
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  clinicalCases       ClinicalCase[]
+  doctorFeedback      DoctorFeedback[]
+  auditLogs           AuditLog[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
+  @@index([organizationId])
   @@map("users")
+}
+
+// Opaque, single-use refresh tokens. Only a SHA-256 hash is stored.
+// Presenting an already-rotated token revokes the whole family (reuse detection).
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  familyId   String    @map("family_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  rotatedAt  DateTime? @map("rotated_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model ClinicalCase {
   id             String             @id @default(uuid())
   doctorId       String             @map("doctor_id")
   organizationId String?            @map("organization_id")
-  idempotencyKey String?            @unique @map("idempotency_key")
+  idempotencyKey String?            @map("idempotency_key")
   caseText       String             @map("case_text") @db.Text
   patientContext Json?              @map("patient_context")
   status         CaseStatus         @default(PENDING)
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
 
-  doctor         User               @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  // Restrict: deleting a user must never silently delete clinical history.
+  doctor         User               @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   analyses       ClinicalAnalysis[]
   mriAnalyses    MriAnalysis[]
 
+  // Idempotency keys are scoped to the submitting doctor, not global.
+  @@unique([doctorId, idempotencyKey])
   @@index([doctorId, createdAt(sort: Desc)])
   @@index([organizationId])
   @@map("clinical_cases")
@@ -125,16 +177,25 @@ model ClinicalAnalysis {
   clinicalCaseId String            @map("clinical_case_id")
   modelName      String            @map("model_name")
   promptVersion  String            @map("prompt_version")
+  // SHA-256 of the exact prompt template used, so provenance does not depend on a label.
+  promptHash     String?           @map("prompt_hash")
+  // True when the output came from the explicit development mock provider, never a real model.
+  isMock         Boolean           @default(false) @map("is_mock")
+  // Null for failed analyses: failures never carry a result payload.
   responseJson   Json?             @map("response_json")
+  // Non-blocking safety findings (e.g. dosing content, injection phrasing) shown to the clinician.
+  safetyFlags    Json?             @map("safety_flags")
   rawTokenUsage  Json?             @map("raw_token_usage")
   latencyMs      Int?              @map("latency_ms")
   status         AnalysisStatus    @default(SUCCESS)
+  errorCode      String?           @map("error_code")
   createdAt      DateTime          @default(now()) @map("created_at")
 
   clinicalCase   ClinicalCase      @relation(fields: [clinicalCaseId], references: [id], onDelete: Cascade)
   feedbacks      DoctorFeedback[]
 
-  @@index([clinicalCaseId])
+  @@index([clinicalCaseId, createdAt(sort: Desc)])
+  @@index([createdAt])
   @@map("clinical_analyses")
 }
 
@@ -147,25 +208,29 @@ model DoctorFeedback {
   createdAt          DateTime         @default(now()) @map("created_at")
 
   clinicalAnalysis   ClinicalAnalysis @relation(fields: [clinicalAnalysisId], references: [id], onDelete: Cascade)
-  doctor             User             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctor             User             @relation(fields: [doctorId], references: [id], onDelete: Restrict)
 
   @@index([clinicalAnalysisId])
   @@map("doctor_feedbacks")
 }
 
+// Append-only: UPDATE and DELETE are rejected by a database trigger (see migrations).
 model AuditLog {
-  id           String   @id @default(uuid())
-  actorUserId  String?  @map("actor_user_id")
-  action       String
-  resourceType String   @map("resource_type")
-  resourceId   String   @map("resource_id")
-  metadata     Json?
-  ipAddress    String?  @map("ip_address")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  actorUserId    String?  @map("actor_user_id")
+  organizationId String?  @map("organization_id")
+  action         String
+  resourceType   String   @map("resource_type")
+  resourceId     String   @map("resource_id")
+  metadata       Json?
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  actorUser    User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  // NoAction: audited users cannot be hard-deleted; deactivate them instead.
+  actorUser      User?    @relation(fields: [actorUserId], references: [id], onDelete: NoAction)
 
   @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
   @@index([resourceType, resourceId])
   @@map("audit_logs")
 }

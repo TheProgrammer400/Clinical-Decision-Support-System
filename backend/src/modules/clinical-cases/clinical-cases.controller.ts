@@ -1,10 +1,12 @@
-import { Controller, Post, Get, Param, Body, Headers, Query, UseGuards, Sse } from '@nestjs/common';
-import { Observable, fromEvent, interval, map, take } from 'rxjs';
-import { ClinicalCasesService } from './clinical-cases.service';
-import { ClinicalAnalysisService } from '../clinical-analysis/clinical-analysis.service';
-import { CreateCaseDto } from './dto/create-case.dto';
+import { Body, Controller, Delete, Get, Headers, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { Response } from 'express';
+import { PaginationQueryDto } from '../../common/dto/pagination.dto';
+import { AuthUser, CurrentUser } from '../../common/decorators/user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/user.decorator';
+import { ClinicalAnalysisService } from '../clinical-analysis/clinical-analysis.service';
+import { ClinicalCasesService } from './clinical-cases.service';
+import { CreateCaseDto } from './dto/create-case.dto';
 
 @Controller('clinical-cases')
 @UseGuards(JwtAuthGuard)
@@ -15,69 +17,44 @@ export class ClinicalCasesController {
   ) {}
 
   @Post()
-  async createCase(
-    @CurrentUser('userId') userId: string,
-    @CurrentUser('organizationId') orgId: string | undefined,
-    @Body() dto: CreateCaseDto,
-    @Headers('idempotency-key') idempotencyKey?: string,
-  ) {
-    return this.casesService.createCase(userId, orgId, dto, idempotencyKey);
+  createCase(@CurrentUser() user: AuthUser, @Body() dto: CreateCaseDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    return this.casesService.createCase(user, dto, idempotencyKey);
   }
 
   @Get()
-  async listCases(
-    @CurrentUser('userId') userId: string,
-    @CurrentUser('role') role: string,
-    @CurrentUser('organizationId') orgId: string | undefined,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.casesService.listCases(userId, role, orgId, parseInt(page, 10), parseInt(limit, 10));
+  listCases(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.casesService.listCases(user, query);
+  }
+
+  @Get('stats')
+  getStats(@CurrentUser() user: AuthUser) {
+    return this.casesService.getStats(user);
   }
 
   @Get(':id')
-  async getCaseById(
-    @Param('id') caseId: string,
-    @CurrentUser('userId') userId: string,
-    @CurrentUser('role') role: string,
-    @CurrentUser('organizationId') orgId: string | undefined,
+  getCaseById(@Param('id', ParseUUIDPipe) caseId: string, @CurrentUser() user: AuthUser) {
+    return this.casesService.getCaseById(user, caseId);
+  }
+
+  @Get(':id/export')
+  async exportCase(
+    @Param('id', ParseUUIDPipe) caseId: string,
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.casesService.getCaseById(caseId, userId, role, orgId);
+    res.setHeader('Content-Disposition', `attachment; filename="cdss-case-${caseId}.json"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return this.casesService.exportCase(user, caseId);
+  }
+
+  @Delete(':id')
+  deleteCase(@Param('id', ParseUUIDPipe) caseId: string, @CurrentUser() user: AuthUser) {
+    return this.casesService.deleteCase(user, caseId);
   }
 
   @Post(':id/analyze')
-  async analyzeCase(
-    @Param('id') caseId: string,
-    @CurrentUser('userId') userId: string,
-  ) {
-    return this.analysisService.analyzeCase(caseId, userId);
-  }
-
-  @Sse(':id/analysis/stream')
-  streamAnalysisStatus(@Param('id') caseId: string): Observable<MessageEvent> {
-    // SSE Stream emitting progressive thinking status indicators
-    const steps = [
-      'Authenticating clinical case evaluation request...',
-      'Sanitizing clinical narrative input...',
-      'Constructing versioned system & safety prompts...',
-      'Invoking Groq LLM inference service...',
-      'Validating structured output schema & qualitative likelihood metrics...',
-      'Applying clinical safety filters & fixed disclaimer...',
-      'Analysis completed successfully.',
-    ];
-
-    return interval(1200).pipe(
-      take(steps.length),
-      map((index) => {
-        return {
-          data: JSON.stringify({
-            step: index + 1,
-            totalSteps: steps.length,
-            message: steps[index],
-            timestamp: new Date().toISOString(),
-          }),
-        } as MessageEvent;
-      }),
-    );
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  analyzeCase(@Param('id', ParseUUIDPipe) caseId: string, @CurrentUser() user: AuthUser) {
+    return this.analysisService.analyzeCase(user, caseId);
   }
 }

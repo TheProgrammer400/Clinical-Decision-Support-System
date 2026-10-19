@@ -1,19 +1,38 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Param,
-  Body,
-  Query,
-  UseGuards,
-  BadRequestException,
-} from '@nestjs/common';
-import { AdminService } from './admin.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { AccountStatus, Role } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsEnum, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/user.decorator';
-import { Role, AccountStatus } from '@prisma/client';
+import { AuthUser, CurrentUser } from '../../common/decorators/user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminService } from './admin.service';
+
+class RegistrationQueryDto {
+  @IsOptional()
+  @IsEnum(AccountStatus)
+  status?: AccountStatus;
+}
+
+class DoctorStatusDto {
+  @IsIn(['Active', 'Suspended'])
+  status!: 'Active' | 'Suspended';
+}
+
+class RoleDto {
+  @IsEnum(Role)
+  role!: Role;
+}
+
+class AnalyticsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days: number = 30;
+}
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,72 +41,73 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('dashboard-stats')
-  async getDashboardStats() {
-    return this.adminService.getDashboardStats();
-  }
-
-  @Get('pending-registrations-count')
-  async getPendingRegistrationsCount() {
-    return this.adminService.getPendingRegistrationsCount();
-  }
-
-  @Get('registration-requests')
-  async getRegistrationRequests(@Query('status') status?: AccountStatus) {
-    return this.adminService.getRegistrationRequests(status);
-  }
-
-  @Patch('registration-requests/:id/approve')
-  async approveRegistrationRequest(
-    @Param('id') userId: string,
-    @CurrentUser('userId') adminUserId: string,
-  ) {
-    return this.adminService.approveRegistrationRequest(userId, adminUserId);
-  }
-
-  @Patch('registration-requests/:id/reject')
-  async rejectRegistrationRequest(
-    @Param('id') userId: string,
-    @CurrentUser('userId') adminUserId: string,
-  ) {
-    return this.adminService.rejectRegistrationRequest(userId, adminUserId);
-  }
-
-  @Get('doctors')
-  async getDoctors() {
-    return this.adminService.getDoctors();
-  }
-
-  @Patch('doctors/:id/status')
-  async updateDoctorStatus(
-    @Param('id') doctorId: string,
-    @Body('status') status: 'Active' | 'Suspended',
-    @CurrentUser('userId') adminUserId: string,
-  ) {
-    if (!status || (status !== 'Active' && status !== 'Suspended')) {
-      throw new BadRequestException('Status must be "Active" or "Suspended"');
-    }
-    return this.adminService.updateDoctorStatus(doctorId, status, adminUserId);
-  }
-
-  @Get('queries')
-  async getQueriesSystemWide(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.adminService.getQueriesSystemWide(
-      parseInt(page, 10),
-      parseInt(limit, 10),
-    );
-  }
-
-  @Get('ai-models')
-  async getAiModelMonitoring() {
-    return this.adminService.getAiModelMonitoring();
+  getDashboardStats(@CurrentUser() admin: AuthUser) {
+    return this.adminService.getDashboardStats(admin);
   }
 
   @Get('system-health')
-  async getSystemHealth() {
-    const stats = await this.adminService.getDashboardStats();
-    return stats.systemHealth;
+  getSystemHealth() {
+    return this.adminService.getSystemHealth();
+  }
+
+  @Get('ai-models')
+  getAiModelMonitoring(@CurrentUser() admin: AuthUser) {
+    return this.adminService.getAiModelMonitoring(admin);
+  }
+
+  @Get('analytics')
+  getAnalytics(@CurrentUser() admin: AuthUser, @Query() query: AnalyticsQueryDto) {
+    return this.adminService.getAnalytics(admin, query.days);
+  }
+
+  @Get('settings')
+  getSettings() {
+    return this.adminService.getSettings();
+  }
+
+  @Get('pending-registrations-count')
+  getPendingRegistrationsCount(@CurrentUser() admin: AuthUser) {
+    return this.adminService.getPendingRegistrationsCount(admin);
+  }
+
+  @Get('registration-requests')
+  getRegistrationRequests(@CurrentUser() admin: AuthUser, @Query() query: RegistrationQueryDto) {
+    return this.adminService.getRegistrationRequests(admin, query.status);
+  }
+
+  @Patch('registration-requests/:id/approve')
+  approve(@Param('id', ParseUUIDPipe) userId: string, @CurrentUser() admin: AuthUser) {
+    return this.adminService.decideRegistration(admin, userId, 'approve');
+  }
+
+  @Patch('registration-requests/:id/reject')
+  reject(@Param('id', ParseUUIDPipe) userId: string, @CurrentUser() admin: AuthUser) {
+    return this.adminService.decideRegistration(admin, userId, 'reject');
+  }
+
+  @Get('doctors')
+  getDoctors(@CurrentUser() admin: AuthUser) {
+    return this.adminService.getDoctors(admin);
+  }
+
+  @Patch('doctors/:id/status')
+  updateDoctorStatus(@Param('id', ParseUUIDPipe) doctorId: string, @Body() dto: DoctorStatusDto, @CurrentUser() admin: AuthUser) {
+    return this.adminService.updateDoctorStatus(admin, doctorId, dto.status);
+  }
+
+  @Post('users/:id/password-reset')
+  issuePasswordReset(@Param('id', ParseUUIDPipe) userId: string, @CurrentUser() admin: AuthUser) {
+    return this.adminService.issuePasswordReset(admin, userId);
+  }
+
+  @Patch('users/:id/role')
+  @Roles(Role.SUPER_ADMIN)
+  setRole(@Param('id', ParseUUIDPipe) userId: string, @Body() dto: RoleDto, @CurrentUser() admin: AuthUser) {
+    return this.adminService.setUserRole(admin, userId, dto.role);
+  }
+
+  @Get('queries')
+  getQueries(@CurrentUser() admin: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.adminService.getQueries(admin, query);
   }
 }

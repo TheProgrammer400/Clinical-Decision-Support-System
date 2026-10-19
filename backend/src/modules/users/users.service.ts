@@ -16,6 +16,8 @@ export class UsersService {
         organizationId: true,
         organization: { select: { id: true, name: true } },
         mfaEnabled: true,
+        mustChangePassword: true,
+        accountStatus: true,
         createdAt: true,
         lastLoginAt: true,
       },

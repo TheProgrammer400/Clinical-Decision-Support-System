@@ -1,71 +1,51 @@
-import os
-import sys
-import json
-import argparse
+"""Quantitative measurements derived from a segmentation mask.
+
+All values are computed on the ANALYSIS_RESOLUTION x ANALYSIS_RESOLUTION resized image. They
+are pixel counts and ratios: without pixel-spacing metadata (e.g. from DICOM) they cannot be
+converted to physical units, and they have not been clinically validated.
+"""
+from typing import Optional
+
 import numpy as np
 from PIL import Image
 
+from app.inference import ANALYSIS_RESOLUTION
+
+# Pixels with any RGB channel above this value count as foreground (non-background).
+FOREGROUND_INTENSITY_THRESHOLD = 10
+
+
 class MetadataExtractionError(Exception):
-    """Custom exception raised when metadata extraction fails."""
-    pass
+    """Raised when measurements cannot be computed."""
 
-def generate_metadata(mask: np.ndarray, original_img: Image.Image = None) -> dict:
+
+def generate_metadata(mask: np.ndarray, original_img: Optional[Image.Image] = None) -> dict:
+    """Returns segmented_pixels, foreground_pixels, area_percent and sqrt_area_percent.
+
+    - segmented_pixels: pixels labelled 1 in the mask.
+    - foreground_pixels: non-background pixels of the resized original (intensity threshold),
+      a rough proxy for imaged tissue; the full image area if no original is given.
+    - area_percent: segmented_pixels / foreground_pixels * 100.
+    - sqrt_area_percent: sqrt(area fraction) * 100. A unitless size indicator, NOT a width.
     """
-    Given a binary segmentation mask array (128x128) and optional original PIL Image,
-    returns quantitative findings: tumor_pixels, brain_pixels, area_percent, visual_width_span_percent.
-    No side effects or file I/O.
-    """
+    if mask is None or not isinstance(mask, np.ndarray) or mask.ndim != 2:
+        raise MetadataExtractionError("Invalid mask array provided for metadata extraction")
+
     try:
-        if mask is None or not isinstance(mask, np.ndarray):
-            raise MetadataExtractionError("Invalid mask array provided for metadata extraction")
-
-        tumor_pixels = int(np.sum(mask == 1))
-
+        segmented = int(np.count_nonzero(mask == 1))
         if original_img is not None:
-            # Resize image to match mask dimension (128x128)
-            img_resized = original_img.convert("RGB").resize((128, 128))
-            img_array = np.array(img_resized)
-            # Exclude dark background pixels (intensity threshold > 10)
-            brain_pixels = int(np.sum(np.any(img_array > 10, axis=-1)))
+            resized = np.array(original_img.convert("RGB").resize((mask.shape[1], mask.shape[0])))
+            foreground = int(np.count_nonzero(np.any(resized > FOREGROUND_INTENSITY_THRESHOLD, axis=-1)))
         else:
-            brain_pixels = int(mask.size)
-
-        total_pixels = brain_pixels if brain_pixels > 0 else mask.size
-        area_pct = (tumor_pixels / total_pixels) * 100.0
-        width_span_pct = np.sqrt(area_pct / 100.0) * 100.0 if area_pct > 0 else 0.0
-
+            foreground = int(mask.size)
+        denominator = foreground if foreground > 0 else int(mask.size)
+        fraction = min(segmented / denominator, 1.0)
         return {
-            "tumor_pixels": tumor_pixels,
-            "brain_pixels": total_pixels,
-            "area_percent": round(float(area_pct), 2),
-            "visual_width_span_percent": round(float(width_span_pct), 1)
+            "segmented_pixels": segmented,
+            "foreground_pixels": denominator,
+            "area_percent": round(fraction * 100.0, 2),
+            "sqrt_area_percent": round(float(np.sqrt(fraction)) * 100.0, 1),
+            "analysis_resolution": ANALYSIS_RESOLUTION,
         }
-    except Exception as e:
-        if isinstance(e, MetadataExtractionError):
-            raise e
-        raise MetadataExtractionError(f"Failed to generate metadata: {str(e)}") from e
-
-def generate_all_metadata_cli(image_folder: str) -> dict:
-    """Developer CLI helper function for directory-based metadata testing."""
-    from app.inference import predict_brain_tumor  # lazy import
-    results = {}
-    if not os.path.exists(image_folder):
-        print(f"Directory {image_folder} does not exist.")
-        return results
-
-    for fname in os.listdir(image_folder):
-        if fname.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-            full_path = os.path.join(image_folder, fname)
-            try:
-                img = Image.open(full_path)
-                # Note: CLI testing helper requires loaded model in inference context
-                print(f"Processing metadata for CLI test: {fname}")
-            except Exception as err:
-                print(f"Error processing {fname}: {err}")
-    return results
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MRI Metadata Extraction CLI Test")
-    parser.add_argument("--image_folder", type=str, default="./imgs", help="Path to image directory")
-    args = parser.parse_args()
-    print(f"Running metadata CLI test on: {args.image_folder}")
+    except Exception as exc:  # noqa: BLE001
+        raise MetadataExtractionError(f"Failed to generate metadata: {exc}") from exc

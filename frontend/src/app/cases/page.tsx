@@ -1,39 +1,35 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope, CheckCircle2 } from 'lucide-react';
+import { Activity, Plus, FileText, Clock, ChevronRight, AlertCircle, Stethoscope } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DoctorSidebar from '@/components/DoctorSidebar';
+import { CaseStatusBadge, SeverityBadge } from '@/components/case/badges';
+import { RequireAuth } from '@/lib/session';
+import { errorMessage, useResource } from '@/lib/use-resource';
+import type { CaseSummary, Paginated } from '@/lib/types';
 
 export default function CasesHistoryPage() {
-  const [cases, setCases] = useState<any[]>([]);
-  const [meta, setMeta] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return (
+    <RequireAuth>
+      <CasesHistory />
+    </RequireAuth>
+  );
+}
+
+function CasesHistory() {
   const [page, setPage] = useState(1);
-
-  const fetchCases = async (currentPage = 1) => {
-    try {
-      setLoading(true);
-      const data = await apiClient.listCases(currentPage, 15);
-      setCases(data.data);
-      setMeta(data.meta);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load case history');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCases(page);
-  }, [page]);
+  const resource = useResource(() => apiClient.listCases(page, 15), String(page));
+  const cases: CaseSummary[] = resource.data?.data ?? [];
+  const meta: Paginated<CaseSummary>['meta'] | null = resource.data?.meta ?? null;
+  const loading = resource.loading;
+  const error = errorMessage(resource.error, 'Failed to load case history');
 
   return (
     <div className="flex min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary selection:text-on-primary">
       <DoctorSidebar />
-      <div className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface min-w-0">
+      <main className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-outline-variant pb-6">
         <div>
@@ -64,7 +60,7 @@ export default function CasesHistoryPage() {
 
       {loading ? (
         <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-3">
-          <Activity className="h-8 w-8 text-primary animate-spin" />
+          <Activity className="h-8 w-8 text-primary animate-spin" aria-hidden="true" />
           <div className="text-on-surface-variant text-sm">Loading case history...</div>
         </div>
       ) : cases.length === 0 ? (
@@ -72,7 +68,7 @@ export default function CasesHistoryPage() {
           <Stethoscope className="h-12 w-12 text-on-surface-variant opacity-40 mx-auto" />
           <h3 className="text-lg font-bold text-on-surface">No Clinical Cases Found</h3>
           <p className="text-sm text-on-surface-variant max-w-sm mx-auto">
-            You haven't submitted any clinical case evaluations yet. Click below to evaluate your first case.
+            You have not submitted any clinical case evaluations yet. Click below to evaluate your first case.
           </p>
           <Link
             href="/cases/new"
@@ -85,8 +81,8 @@ export default function CasesHistoryPage() {
       ) : (
         <div className="space-y-3">
           {cases.map((c) => {
-            const latestAnalysis = c.analyses?.[0];
-            const hasMri = c.mriAnalyses && c.mriAnalyses.length > 0;
+            const latestAnalysis = c.latestAnalysis;
+            const hasMri = c.mriCount > 0;
 
             return (
               <Link
@@ -100,25 +96,16 @@ export default function CasesHistoryPage() {
                       <span className="text-xs font-mono text-on-surface-variant bg-surface-container-lowest px-2 py-0.5 rounded border border-outline-variant">
                         #{c.id.slice(0, 8)}
                       </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
-                          c.status === 'COMPLETED'
-                            ? 'bg-tertiary-fixed/10 text-tertiary border border-tertiary/20'
-                            : c.status === 'FAILED'
-                            ? 'bg-error-container/40 text-error border border-error/30'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                      <CaseStatusBadge status={c.status} />
+                      <SeverityBadge severity={latestAnalysis?.alertSeverity ?? null} isMock={latestAnalysis?.isMock} />
                       {hasMri && (
                         <span className="text-xs px-2 py-0.5 rounded font-mono bg-primary-fixed/10 text-primary border border-primary/20">
-                          MRI GPU
+                          {c.mriCount} MRI image{c.mriCount === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-on-surface truncate font-medium">
-                      {c.caseText}
+                      {c.caseTextPreview}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-on-surface-variant pt-0.5">
                       <span className="flex items-center gap-1">
@@ -162,7 +149,7 @@ export default function CasesHistoryPage() {
           )}
         </div>
       )}
-      </div>
+      </main>
     </div>
   );
 }

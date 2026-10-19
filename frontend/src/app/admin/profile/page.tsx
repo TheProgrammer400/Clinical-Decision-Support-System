@@ -1,42 +1,29 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import Link from 'next/link';
 import { UserCheck } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { Card, PageHeader } from '@/components/admin/ui';
+import { useSession } from '@/lib/session';
 
 export default function AdminProfilePage() {
-  const [profile, setProfile] = useState<any>(null);
-
-  useEffect(() => {
-    apiClient.getProfile().then(setProfile).catch(() => null);
-  }, []);
-
+  const { user } = useSession();
+  if (!user) return null;
   return (
-    <div className="space-y-6 pb-12">
-      <div className="p-6 glass-panel rounded-3xl border border-purple-500/30">
-        <h1 className="text-2xl font-bold text-slate-100 flex items-center space-x-2">
-          <UserCheck className="h-6 w-6 text-purple-400" />
-          <span>Admin Profile & Identity</span>
-        </h1>
-        <p className="text-sm text-slate-400">IT system administrator account details and permissions.</p>
-      </div>
-
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-        <div className="space-y-3 text-xs font-mono">
-          <div className="flex justify-between p-3.5 bg-slate-900 rounded-xl">
-            <span className="text-slate-400">Full Name:</span>
-            <span className="text-slate-100 font-bold">{profile?.fullName || 'System Administrator'}</span>
-          </div>
-          <div className="flex justify-between p-3.5 bg-slate-900 rounded-xl">
-            <span className="text-slate-400">Email Address:</span>
-            <span className="text-slate-100 font-bold">{profile?.email || 'admin@cdss.med'}</span>
-          </div>
-          <div className="flex justify-between p-3.5 bg-slate-900 rounded-xl">
-            <span className="text-slate-400">Role:</span>
-            <span className="text-purple-300 font-bold">{profile?.role || 'ORG_ADMIN'}</span>
-          </div>
+    <div className="space-y-6 pb-12 max-w-2xl">
+      <PageHeader icon={<UserCheck className="h-6 w-6 text-primary" />} title="Your account" description="Signed-in administrator." />
+      <Card>
+        <dl className="text-sm space-y-2">
+          <div className="flex justify-between"><dt className="text-on-surface-variant">Name</dt><dd>{user.fullName}</dd></div>
+          <div className="flex justify-between"><dt className="text-on-surface-variant">Email</dt><dd className="font-mono">{user.email}</dd></div>
+          <div className="flex justify-between"><dt className="text-on-surface-variant">Role</dt><dd>{user.role}</dd></div>
+          <div className="flex justify-between"><dt className="text-on-surface-variant">Two-step verification</dt><dd>{user.mfaEnabled ? 'Enabled' : 'Not enabled'}</dd></div>
+        </dl>
+        <div className="flex gap-4 text-xs pt-2">
+          <Link href="/account/security" className="text-primary hover:underline">Manage two-step verification</Link>
+          <Link href="/account/password" className="text-primary hover:underline">Change password</Link>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

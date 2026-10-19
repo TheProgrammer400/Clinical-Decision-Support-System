@@ -1,24 +1,30 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field
 
+
 class MriFindings(BaseModel):
-    tumor_pixels: int = Field(..., description="Number of positive tumor mask pixels")
-    brain_pixels: int = Field(..., description="Total visible brain tissue pixels")
-    area_percent: float = Field(..., description="Tumor area percentage relative to brain tissue")
-    visual_width_span_percent: float = Field(..., description="Estimated visual width span percentage")
+    segmented_pixels: int = Field(..., ge=0, description="Pixels labelled as segmented region")
+    foreground_pixels: int = Field(..., ge=0, description="Non-background pixels (intensity threshold)")
+    area_percent: float = Field(..., ge=0, le=100, description="segmented / foreground * 100")
+    sqrt_area_percent: float = Field(..., ge=0, le=100, description="sqrt(area fraction) * 100; not a width")
+    analysis_resolution: int = Field(..., gt=0, description="Side length in pixels of the analysed image")
+
 
 class Visualizations(BaseModel):
-    segmented_mask: str = Field(..., description="Base64-encoded PNG string of binary mask")
-    tumor_overlay: str = Field(..., description="Base64-encoded PNG string of tumor overlay image")
+    segmented_mask: str = Field(..., description="PNG data URI of the binary mask")
+    tumor_overlay: str = Field(..., description="PNG data URI of the overlay")
+
 
 class ImageAnalysisResult(BaseModel):
     image_name: str
-    status: str  # "completed" | "failed"
+    status: Literal["completed", "failed"]
     findings: Optional[MriFindings] = None
     visualizations: Optional[Visualizations] = None
     model_version: str
     processing_time_ms: int
     error_message: Optional[str] = None
+
 
 class MultiImageResponse(BaseModel):
     data: List[ImageAnalysisResult]

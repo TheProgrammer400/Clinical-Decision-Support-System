@@ -1,0 +1,13 @@
+{
+  "moduleFileExtensions": ["js", "mjs", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.ts$": ["ts-jest", { "tsconfig": "test/tsconfig.json" }],
+    "^.+\\.m?js$": ["ts-jest", { "tsconfig": { "allowJs": true, "module": "commonjs", "target": "ES2022" } }]
+  },
+  "transformIgnorePatterns": ["/node_modules/(?!(@scure|@noble|@otplib|otplib)/)"],
+  "setupFiles": ["<rootDir>/setup-env.ts"],
+  "testTimeout": 60000
+}

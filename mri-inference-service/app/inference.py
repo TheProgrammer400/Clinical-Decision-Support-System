@@ -1,83 +1,80 @@
-import io
 import base64
-import torch
+import io
+from typing import Tuple
+
 import numpy as np
+import torch
 from PIL import Image
 from scipy import ndimage
 from torchvision import transforms
-from typing import Tuple, Dict, Any
+
+# The network operates on fixed-size inputs. Measurements are therefore pixel counts at this
+# resolution, not physical sizes.
+ANALYSIS_RESOLUTION = 128
+
 
 class InferenceError(Exception):
-    """Custom exception raised during model forward pass / preprocessing."""
-    pass
+    """Raised when preprocessing or the model forward pass fails."""
+
 
 class VisualizationError(Exception):
-    """Custom exception raised during visualization rendering."""
-    pass
+    """Raised when rendering the mask or overlay fails."""
 
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-])
+
+transform = transforms.Compose(
+    [
+        transforms.Resize((ANALYSIS_RESOLUTION, ANALYSIS_RESOLUTION)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ]
+)
+
 
 def run_inference(image: Image.Image, model, device: str, min_component_size: int = 50) -> np.ndarray:
-    """
-    Preprocess PIL Image -> forward pass under torch.no_grad() -> scipy component cleanup -> returns 128x128 binary mask array.
+    """Preprocess -> forward pass -> threshold -> remove small components.
+
+    Returns a binary uint8 mask of shape (ANALYSIS_RESOLUTION, ANALYSIS_RESOLUTION).
     """
     try:
-        rgb_image = image.convert("RGB")
-        input_tensor = transform(rgb_image).unsqueeze(0).to(device)
-
+        input_tensor = transform(image.convert("RGB")).unsqueeze(0).to(device)
         with torch.no_grad():
             output = model(input_tensor)
-            probability_mask = torch.sigmoid(output)
-            binary_mask = (probability_mask > 0.5).float()
+    except Exception as exc:  # noqa: BLE001
+        raise InferenceError(f"Model forward pass failed: {exc}") from exc
 
-        mask = binary_mask.squeeze().cpu().numpy().astype(np.uint8)
-        
-        # Scipy connected components filtering
-        labels, num_components = ndimage.label(mask)
-        cleaned_mask = np.zeros_like(mask)
-        for label in range(1, num_components + 1):
-            component = (labels == label)
-            if np.sum(component) >= min_component_size:
-                cleaned_mask[component] = 1
+    if output.shape[-2:] != (ANALYSIS_RESOLUTION, ANALYSIS_RESOLUTION):
+        raise InferenceError(f"Unexpected model output shape {tuple(output.shape)}")
+    if not torch.isfinite(output).all():
+        raise InferenceError("Model produced non-finite values")
 
-        return cleaned_mask
-    except Exception as e:
-        raise InferenceError(f"U-Net model inference execution failed: {str(e)}") from e
+    mask = (torch.sigmoid(output) > 0.5).squeeze().cpu().numpy().astype(np.uint8)
+
+    labels, num_components = ndimage.label(mask)
+    if num_components == 0:
+        return mask
+    sizes = ndimage.sum(mask, labels, index=range(1, num_components + 1))
+    keep = np.isin(labels, [i + 1 for i, size in enumerate(sizes) if size >= min_component_size])
+    return keep.astype(np.uint8)
+
 
 def generate_visualizations(original: Image.Image, mask: np.ndarray, alpha: float = 0.5) -> Tuple[bytes, bytes]:
-    """
-    Generates raw PNG bytes for (segmented_mask_png, tumor_overlay_png).
-    """
+    """Returns PNG bytes for (binary mask, red overlay on the resized original)."""
     try:
-        original_resized = original.convert("RGB").resize((128, 128))
-        original_array = np.array(original_resized)
+        original_array = np.array(original.convert("RGB").resize((ANALYSIS_RESOLUTION, ANALYSIS_RESOLUTION)))
 
-        # 1. Segmented Mask PNG
-        mask_image = Image.fromarray((mask * 255).astype(np.uint8))
         mask_buf = io.BytesIO()
-        mask_image.save(mask_buf, format="PNG")
-        mask_bytes = mask_buf.getvalue()
+        Image.fromarray((mask * 255).astype(np.uint8)).save(mask_buf, format="PNG")
 
-        # 2. Tumor Overlay PNG (red highlight where mask == 1)
         overlay_array = original_array.copy()
-        red_mask = (mask == 1)
-        overlay_array[red_mask] = (
-            (1 - alpha) * overlay_array[red_mask] + alpha * np.array([255, 0, 0])
-        ).astype(np.uint8)
-        overlay_image = Image.fromarray(overlay_array)
+        region = mask == 1
+        overlay_array[region] = ((1 - alpha) * overlay_array[region] + alpha * np.array([255, 0, 0])).astype(np.uint8)
         overlay_buf = io.BytesIO()
-        overlay_image.save(overlay_buf, format="PNG")
-        overlay_bytes = overlay_buf.getvalue()
+        Image.fromarray(overlay_array).save(overlay_buf, format="PNG")
 
-        return mask_bytes, overlay_bytes
-    except Exception as e:
-        raise VisualizationError(f"Visualization rendering failed: {str(e)}") from e
+        return mask_buf.getvalue(), overlay_buf.getvalue()
+    except Exception as exc:  # noqa: BLE001
+        raise VisualizationError(f"Visualization rendering failed: {exc}") from exc
+
 
 def pil_image_to_base64_data_uri(png_bytes: bytes) -> str:
-    """Converts PNG bytes into base64 data URI string."""
-    b64_str = base64.b64encode(png_bytes).decode("utf-8")
-    return f"data:image/png;base64,{b64_str}"
+    return "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")

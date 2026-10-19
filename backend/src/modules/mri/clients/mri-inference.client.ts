@@ -1,59 +1,56 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from '../../config/config.service';
 import {
+  MriInferenceError,
   MriInferenceProvider,
-  UploadFileParam,
   MultiImageInferenceResponse,
+  UploadFileParam,
+  multiImageResponseSchema,
 } from '../interfaces/mri-inference-provider.interface';
 
 @Injectable()
 export class HttpMriInferenceClient implements MriInferenceProvider {
   private readonly logger = new Logger(HttpMriInferenceClient.name);
 
-  constructor(private readonly configService: AppConfigService) {}
+  constructor(private readonly config: AppConfigService) {}
 
   async analyzeImages(files: UploadFileParam[]): Promise<MultiImageInferenceResponse> {
-    const serviceUrl = this.configService.mriInferenceServiceUrl || 'http://localhost:8000';
-    const targetUrl = `${serviceUrl.replace(/\/$/, '')}/predict`;
+    const targetUrl = `${this.config.mriInferenceServiceUrl}/predict`;
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.filename);
+    }
 
-    this.logger.log(`Invoking MRI Inference Service at ${targetUrl} for ${files.length} file(s)...`);
+    const headers: Record<string, string> = {};
+    if (this.config.mriInferenceToken) {
+      headers['X-Inference-Token'] = this.config.mriInferenceToken;
+    }
 
+    let response: Response;
     try {
-      // Build multipart/form-data payload natively using Blob / FormData in Node 18+
-      const formData = new FormData();
-
-      for (const file of files) {
-        const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype });
-        formData.append('files', blob, file.filename);
-      }
-
-      const response = await fetch(targetUrl, {
+      response = await fetch(targetUrl, {
         method: 'POST',
         body: formData,
+        headers,
+        signal: AbortSignal.timeout(this.config.mriInferenceTimeoutMs),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error(`MRI Inference Service returned HTTP ${response.status}: ${errorText}`);
-        throw new ServiceUnavailableException(
-          `MRI Inference Service request failed with HTTP status ${response.status}: ${errorText}`,
-        );
-      }
-
-      const data: MultiImageInferenceResponse = await response.json();
-      this.logger.log(
-        `MRI Inference Service completed analysis. Processed ${data.total_images} image(s), model_version=${data.model_version}`,
-      );
-
-      return data;
     } catch (error) {
-      this.logger.error(`Failed to execute MRI inference request: ${error.message}`, error.stack);
-      if (error instanceof ServiceUnavailableException) {
-        throw error;
-      }
-      throw new ServiceUnavailableException(
-        `MRI Inference Service connection error: ${error.message}`,
-      );
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      this.logger.error(`MRI inference request failed: ${message}`);
+      throw new MriInferenceError(message);
     }
+
+    if (!response.ok) {
+      const body = (await response.text().catch(() => '')).slice(0, 500);
+      this.logger.error(`MRI inference returned HTTP ${response.status}: ${body}`);
+      throw new MriInferenceError(`HTTP ${response.status}`);
+    }
+
+    const parsed = multiImageResponseSchema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) {
+      this.logger.error(`MRI inference response failed validation: ${parsed.error.issues[0]?.message}`);
+      throw new MriInferenceError('Malformed inference response');
+    }
+    return parsed.data;
   }
 }

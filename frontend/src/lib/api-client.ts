@@ -1,255 +1,199 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import type {
+  Analysis,
+  CaseDetail,
+  CaseStats,
+  CaseSummary,
+  FeedbackRating,
+  MriAnalysis,
+  Paginated,
+  PatientContext,
+  SessionUser,
+} from './types';
 
-let accessTokenMemory: string | null = null;
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1').replace(/\/$/, '');
 
-export const setAccessToken = (token: string | null) => {
-  accessTokenMemory = token;
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem('cdss_access_token', token);
-    } else {
-      localStorage.removeItem('cdss_access_token');
+/** Normalised API error. `message` is always a displayable string. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string,
+    readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// The access token lives only in memory (never localStorage), so injected scripts cannot
+// read a long-lived credential. After a reload it is restored through the httpOnly
+// refresh-token cookie.
+let accessToken: string | null = null;
+let refreshInFlight: Promise<SessionUser | null> | null = null;
+const listeners = new Set<(user: SessionUser | null) => void>();
+
+export function onSessionChange(listener: (user: SessionUser | null) => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function setSession(token: string | null, user: SessionUser | null) {
+  accessToken = token;
+  listeners.forEach((l) => l(user));
+}
+
+export function hasAccessToken() {
+  return accessToken !== null;
+}
+
+async function toApiError(res: Response): Promise<ApiError> {
+  let body: { message?: unknown; code?: unknown; details?: unknown } = {};
+  try {
+    body = await res.json();
+  } catch {
+    // Non-JSON error body.
+  }
+  const raw = body.message;
+  const message = Array.isArray(raw) ? raw.join(' ') : typeof raw === 'string' ? raw : `Request failed (${res.status})`;
+  return new ApiError(message, res.status, typeof body.code === 'string' ? body.code : 'ERROR', body.details as Record<string, unknown> | undefined);
+}
+
+/**
+ * Exchanges the refresh cookie for a new access token. Concurrent callers share one request:
+ * refresh tokens are single-use and a parallel second use would be treated as token theft.
+ */
+export function refreshSession(): Promise<SessionUser | null> {
+  refreshInFlight ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        setSession(null, null);
+        return null;
+      }
+      const data = (await res.json()) as { accessToken: string; user: SessionUser };
+      setSession(data.accessToken, data.user);
+      return data.user;
+    } catch {
+      setSession(null, null);
+      return null;
+    } finally {
+      refreshInFlight = null;
     }
-  }
-};
+  })();
+  return refreshInFlight;
+}
 
-export const getAccessToken = (): string | null => {
-  if (accessTokenMemory) return accessTokenMemory;
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('cdss_access_token');
-  }
-  return null;
-};
+interface RequestOptions extends Omit<RequestInit, 'body'> {
+  body?: unknown;
+  /** Skip the automatic refresh-and-retry on 401 (used by auth endpoints). */
+  noRetry?: boolean;
+}
 
-export const getArtifactUrl = (url: string | null | undefined): string => {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  const baseUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
-  return `${baseUrl}${url}`;
-};
-
-async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = getAccessToken();
-  const headers = new Headers(options.headers || {});
-  
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+async function rawRequest(path: string, options: RequestOptions = {}): Promise<Response> {
+  const { body, noRetry, headers: extraHeaders, ...init } = options;
+  const headers = new Headers(extraHeaders);
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isForm) {
     headers.set('Content-Type', 'application/json');
   }
-  
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+  const send = () => {
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+    });
+  };
 
-  options.credentials = 'include';
-  options.headers = headers;
-
-  let response = await fetch(`${API_BASE_URL}${url}`, options);
-
-  if (response.status === 401 && !url.includes('/auth/login') && !url.includes('/auth/refresh')) {
-    // Attempt automatic refresh
-    try {
-      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
-        setAccessToken(refreshData.accessToken);
-        
-        // Retry original request with new token
-        headers.set('Authorization', `Bearer ${refreshData.accessToken}`);
-        response = await fetch(`${API_BASE_URL}${url}`, options);
-      } else {
-        setAccessToken(null);
-        if (
-          typeof window !== 'undefined' &&
-          window.location.pathname !== '/login' &&
-          window.location.pathname !== '/register'
-        ) {
-          window.location.href = '/login';
-        }
-      }
-    } catch (e) {
-      setAccessToken(null);
+  let res = await send();
+  if (res.status === 401 && !noRetry) {
+    if (await refreshSession()) {
+      res = await send();
     }
   }
+  return res;
+}
 
-  return response;
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await rawRequest(path, options);
+  if (!res.ok) {
+    throw await toApiError(res);
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+export type LoginResult = { mfaRequired: true; mfaToken: string } | { mfaRequired: false; user: SessionUser };
+
+async function establish(path: string, body: unknown): Promise<SessionUser> {
+  const data = await request<{ accessToken: string; user: SessionUser }>(path, { method: 'POST', body, noRetry: true });
+  setSession(data.accessToken, data.user);
+  return data.user;
 }
 
 export const apiClient = {
-  async register(data: any) {
-    const res = await fetchWithAuth('/auth/register', {
+  // ----- auth
+  async login(email: string, password: string): Promise<LoginResult> {
+    const data = await request<{ mfaRequired?: boolean; mfaToken?: string; accessToken?: string; user?: SessionUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: { email, password },
+      noRetry: true,
     });
-    if (!res.ok) throw await res.json();
-    const json = await res.json();
-    if (json.accessToken) setAccessToken(json.accessToken);
-    return json;
+    if (data.mfaRequired && data.mfaToken) {
+      return { mfaRequired: true, mfaToken: data.mfaToken };
+    }
+    setSession(data.accessToken!, data.user!);
+    return { mfaRequired: false, user: data.user! };
   },
-
-  async login(credentials: any) {
-    const res = await fetchWithAuth('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    if (!res.ok) throw await res.json();
-    const json = await res.json();
-    if (json.accessToken) setAccessToken(json.accessToken);
-    return json;
-  },
-
+  completeMfaLogin: (mfaToken: string, code: string) => establish('/auth/mfa/login', { mfaToken, code }),
+  register: (data: { email: string; password: string; confirmPassword: string; fullName: string; organizationName?: string }) =>
+    request<{ message: string }>('/auth/register', { method: 'POST', body: data, noRetry: true }),
   async logout() {
     try {
-      await fetchWithAuth('/auth/logout', { method: 'POST' });
+      await request('/auth/logout', { method: 'POST', noRetry: true });
+    } catch {
+      // Already signed out server-side.
     } finally {
-      setAccessToken(null);
+      setSession(null, null);
     }
   },
+  getSession: () => request<SessionUser>('/auth/session'),
+  changePassword: (currentPassword: string, newPassword: string) => establish('/auth/change-password', { currentPassword, newPassword }),
+  resetPassword: (token: string, newPassword: string) =>
+    request<{ message: string }>('/auth/password-reset/confirm', { method: 'POST', body: { token, newPassword }, noRetry: true }),
+  beginMfaEnrollment: () => request<{ secret: string; otpauthUri: string }>('/auth/mfa/enroll', { method: 'POST' }),
+  confirmMfa: (code: string) => request<{ mfaEnabled: boolean }>('/auth/mfa/confirm', { method: 'POST', body: { code } }),
+  disableMfa: (code: string) => request<{ mfaEnabled: boolean }>('/auth/mfa/disable', { method: 'POST', body: { code } }),
 
-  async getProfile() {
-    const res = await fetchWithAuth('/users/me');
-    if (!res.ok) throw await res.json();
-    return res.json();
+  // ----- cases
+  createCase: (caseText: string, patientContext: PatientContext, idempotencyKey: string) =>
+    request<{ id: string }>('/clinical-cases', { method: 'POST', body: { caseText, patientContext }, headers: { 'Idempotency-Key': idempotencyKey } }),
+  getCase: (id: string) => request<CaseDetail>(`/clinical-cases/${encodeURIComponent(id)}`),
+  listCases: (page = 1, limit = 20) => request<Paginated<CaseSummary>>(`/clinical-cases?page=${page}&limit=${limit}`),
+  getCaseStats: () => request<CaseStats>('/clinical-cases/stats'),
+  analyzeCase: (id: string) => request<Analysis>(`/clinical-cases/${encodeURIComponent(id)}/analyze`, { method: 'POST' }),
+  exportCase: (id: string) => request<Record<string, unknown>>(`/clinical-cases/${encodeURIComponent(id)}/export`),
+  submitFeedback: (analysisId: string, rating: FeedbackRating, comment?: string) =>
+    request(`/clinical-analysis/${encodeURIComponent(analysisId)}/feedback`, { method: 'POST', body: { rating, comment: comment || undefined } }),
+
+  // ----- MRI
+  uploadMri(caseId: string, files: File[]) {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f));
+    return request<MriAnalysis[]>(`/clinical-cases/${encodeURIComponent(caseId)}/mri`, { method: 'POST', body: form });
+  },
+  getCaseMriAnalyses: (caseId: string) => request<MriAnalysis[]>(`/clinical-cases/${encodeURIComponent(caseId)}/mri`),
+  /** Fetches an artifact with the Authorization header; returns an object URL the caller must revoke. */
+  async getArtifactObjectUrl(caseId: string, mriId: string, kind: 'original' | 'mask' | 'overlay'): Promise<string> {
+    const res = await rawRequest(`/clinical-cases/${encodeURIComponent(caseId)}/mri/${encodeURIComponent(mriId)}/artifacts/${kind}`);
+    if (!res.ok) throw await toApiError(res);
+    return URL.createObjectURL(await res.blob());
   },
 
-  async createCase(caseText: string, patientContext?: any, idempotencyKey?: string) {
-    const headers: Record<string, string> = {};
-    if (idempotencyKey) {
-      headers['idempotency-key'] = idempotencyKey;
-    }
-
-    const res = await fetchWithAuth('/clinical-cases', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ caseText, patientContext }),
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getCase(id: string) {
-    const res = await fetchWithAuth(`/clinical-cases/${id}`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async listCases(page = 1, limit = 20) {
-    const res = await fetchWithAuth(`/clinical-cases?page=${page}&limit=${limit}`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async analyzeCase(id: string) {
-    const res = await fetchWithAuth(`/clinical-cases/${id}/analyze`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async submitFeedback(analysisId: string, rating: string, comment?: string) {
-    const res = await fetchWithAuth(`/clinical-analysis/${analysisId}/feedback`, {
-      method: 'POST',
-      body: JSON.stringify({ rating, comment }),
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAuditLogs(page = 1, limit = 50) {
-    const res = await fetchWithAuth(`/admin/audit-logs?page=${page}&limit=${limit}`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAdminDashboardStats() {
-    const res = await fetchWithAuth('/admin/dashboard-stats');
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAdminDoctors() {
-    const res = await fetchWithAuth('/admin/doctors');
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async updateDoctorStatus(doctorId: string, status: 'Active' | 'Suspended') {
-    const res = await fetchWithAuth(`/admin/doctors/${doctorId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAdminQueries(page = 1, limit = 20) {
-    const res = await fetchWithAuth(`/admin/queries?page=${page}&limit=${limit}`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAdminAiModels() {
-    const res = await fetchWithAuth('/admin/ai-models');
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getAdminSystemHealth() {
-    const res = await fetchWithAuth('/admin/system-health');
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getPendingRegistrationsCount() {
-    const res = await fetchWithAuth('/admin/pending-registrations-count');
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getRegistrationRequests(status?: string) {
-    const query = status ? `?status=${status}` : '';
-    const res = await fetchWithAuth(`/admin/registration-requests${query}`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async approveRegistrationRequest(id: string) {
-    const res = await fetchWithAuth(`/admin/registration-requests/${id}/approve`, {
-      method: 'PATCH',
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async rejectRegistrationRequest(id: string) {
-    const res = await fetchWithAuth(`/admin/registration-requests/${id}/reject`, {
-      method: 'PATCH',
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async uploadMri(caseId: string, files: File[]) {
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append('files', file);
-    }
-    const res = await fetchWithAuth(`/clinical-cases/${caseId}/mri`, {
-      method: 'POST',
-      body: formData,
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-
-  async getCaseMriAnalyses(caseId: string) {
-    const res = await fetchWithAuth(`/clinical-cases/${caseId}/mri`);
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
+  // ----- generic admin access (typed at call sites)
+  get: <T>(path: string) => request<T>(path),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
+  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
 };

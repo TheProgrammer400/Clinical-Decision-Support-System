@@ -1,35 +1,51 @@
-export interface MriFindingsResult {
-  tumor_pixels: number;
-  brain_pixels: number;
-  area_percent: number;
-  visual_width_span_percent: number;
-}
+import { z } from 'zod';
 
-export interface VisualizationsResult {
-  segmented_mask: string; // base64 string
-  tumor_overlay: string;  // base64 string
-}
+const findingsSchema = z
+  .object({
+    segmented_pixels: z.number().int().nonnegative().optional(),
+    foreground_pixels: z.number().int().nonnegative().optional(),
+    tumor_pixels: z.number().int().nonnegative().optional(),
+    brain_pixels: z.number().int().nonnegative().optional(),
+    area_percent: z.number().min(0).max(100),
+    sqrt_area_percent: z.number().min(0).max(100).optional(),
+    visual_width_span_percent: z.number().min(0).max(100).optional(),
+    analysis_resolution: z.number().int().positive().optional(),
+  })
+  .passthrough();
 
-export interface SingleImageInferenceResult {
-  image_name: string;
-  status: 'completed' | 'failed';
-  findings?: MriFindingsResult;
-  visualizations?: VisualizationsResult;
-  model_version: string;
-  processing_time_ms: number;
-  error_message?: string;
-}
+export const singleImageResultSchema = z.object({
+  image_name: z.string(),
+  status: z.enum(['completed', 'failed']),
+  findings: findingsSchema.nullish(),
+  visualizations: z.object({ segmented_mask: z.string(), tumor_overlay: z.string() }).nullish(),
+  model_version: z.string(),
+  processing_time_ms: z.number().int().nonnegative(),
+  error_message: z.string().nullish(),
+});
 
-export interface MultiImageInferenceResponse {
-  data: SingleImageInferenceResult[];
-  total_images: number;
-  model_version: string;
-}
+export const multiImageResponseSchema = z.object({
+  data: z.array(singleImageResultSchema),
+  total_images: z.number().int().nonnegative(),
+  model_version: z.string(),
+});
+
+export type SingleImageInferenceResult = z.infer<typeof singleImageResultSchema>;
+export type MultiImageInferenceResponse = z.infer<typeof multiImageResponseSchema>;
 
 export interface UploadFileParam {
+  /** Server-generated, unique per request; used to match results to records. */
   filename: string;
   buffer: Buffer;
   mimetype: string;
+}
+
+export const MRI_INFERENCE_PROVIDER = 'MriInferenceProvider';
+
+export class MriInferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MriInferenceError';
+  }
 }
 
 export interface MriInferenceProvider {

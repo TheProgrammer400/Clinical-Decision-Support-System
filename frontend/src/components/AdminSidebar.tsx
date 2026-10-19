@@ -27,7 +27,7 @@ export default function AdminSidebar() {
 
     const fetchPendingCount = async () => {
       try {
-        const res = await apiClient.getPendingRegistrationsCount();
+        const res = await apiClient.get<{ count: number }>('/admin/pending-registrations-count');
         if (isMounted) {
           setPendingCount(res.count || 0);
         }
@@ -44,6 +44,7 @@ export default function AdminSidebar() {
       clearInterval(interval);
     };
   }, [pathname]);
+  // Note: the count is re-fetched every 15 s while an admin page is open.
 
   const mainNavItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -74,7 +75,7 @@ export default function AdminSidebar() {
           <div>
             <h3 className="text-sm font-bold text-on-surface">Admin Portal</h3>
             <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-mono">
-              IT Ops Control Center
+              Administration
             </p>
           </div>
         </div>
