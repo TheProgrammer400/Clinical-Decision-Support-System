@@ -38,12 +38,22 @@ export const INPUT_CLASS =
 export const BUTTON_CLASS =
   'w-full bg-primary hover:bg-primary-fixed-dim text-on-primary font-medium py-2.5 rounded flex items-center justify-center gap-2 disabled:opacity-50';
 
-export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+/** Labelled form field. The hint is linked via aria-describedby so it is not part of the accessible name. */
+export function Field({ label, children, hint }: { label: string; children: React.ReactElement<{ id?: string; 'aria-describedby'?: string }>; hint?: string }) {
+  const id = React.useId();
+  const hintId = `${id}-hint`;
+  const control = React.cloneElement(children, { id, 'aria-describedby': hint ? hintId : undefined });
   return (
-    <label className="block space-y-1.5 text-xs font-medium text-on-surface-variant">
-      <span>{label}</span>
-      {children}
-      {hint && <span className="block text-[11px] font-normal">{hint}</span>}
-    </label>
+    <div className="space-y-1.5 text-xs font-medium text-on-surface-variant">
+      <label htmlFor={id} className="block">
+        {label}
+      </label>
+      {control}
+      {hint && (
+        <p id={hintId} className="text-[11px] font-normal">
+          {hint}
+        </p>
+      )}
+    </div>
   );
 }

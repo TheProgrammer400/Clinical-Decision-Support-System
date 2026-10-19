@@ -18,9 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <div className="min-h-screen flex flex-col bg-background text-on-surface">
             <Navbar />
-            <main className="flex-1 w-full">
-              {children}
-            </main>
+            {/* Each page renders its own <main> landmark. */}
+            <div className="flex-1 w-full">{children}</div>
             <footer className="w-full py-8 px-6 bg-surface-container-lowest border-t border-outline-variant text-center text-xs text-on-surface-variant">
               <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="flex flex-col text-left">

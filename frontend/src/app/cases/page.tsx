@@ -44,7 +44,7 @@ function CasesHistory() {
   return (
     <div className="flex min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary selection:text-on-primary">
       <DoctorSidebar />
-      <div className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface min-w-0">
+      <main className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full space-y-6 font-body text-on-surface min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-outline-variant pb-6">
         <div>
@@ -164,7 +164,7 @@ function CasesHistory() {
           )}
         </div>
       )}
-      </div>
+      </main>
     </div>
   );
 }
