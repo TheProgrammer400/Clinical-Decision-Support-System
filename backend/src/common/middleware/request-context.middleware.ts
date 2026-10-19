@@ -10,7 +10,7 @@ const logger = new Logger('HTTP');
  * response, and writes one structured access-log line per request, including failures.
  * Only the path is logged: query strings and bodies may contain clinical text.
  */
-export function requestContextMiddleware(req: Request & { requestId?: string; user?: any }, res: Response, next: NextFunction) {
+export function requestContextMiddleware(req: Request & { requestId?: string; user?: { userId?: string } }, res: Response, next: NextFunction) {
   const incoming = req.header('x-request-id');
   const requestId = incoming && ID_PATTERN.test(incoming) ? incoming : randomUUID();
   req.requestId = requestId;

@@ -96,7 +96,9 @@ export type Env = z.infer<typeof envSchema>;
 
 /** Used by @nestjs/config: throws a readable error listing every invalid variable. */
 export function validateEnv(raw: Record<string, unknown>): Env {
-  const result = envSchema.safeParse(raw);
+  // An empty value (e.g. `MRI_INFERENCE_TOKEN=` in a .env file) means "not set".
+  const cleaned = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== ''));
+  const result = envSchema.safeParse(cleaned);
   if (!result.success) {
     const details = result.error.issues.map((i) => `  - ${i.path.join('.') || 'env'}: ${i.message}`).join('\n');
     throw new Error(`Invalid configuration. Refusing to start:\n${details}`);

@@ -23,7 +23,6 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   // Configuration errors land here; print them plainly and exit non-zero.
-  // eslint-disable-next-line no-console
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 });

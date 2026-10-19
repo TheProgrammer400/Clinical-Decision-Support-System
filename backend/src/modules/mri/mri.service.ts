@@ -235,5 +235,7 @@ function decodePng(value: string): Buffer {
 /** Display-only filename: strip paths and control characters, cap length. */
 function safeName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'image';
-  return base.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200) || 'image';
+  // Drop ASCII control characters (code points below 0x20 and DEL).
+  const printable = [...base].filter((ch) => ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f).join('');
+  return printable.slice(0, 200) || 'image';
 }

@@ -1,5 +1,5 @@
 # Multi-stage production Dockerfile for the NestJS backend
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN apk add --no-cache openssl libc6-compat
 
@@ -12,7 +12,7 @@ RUN npm ci
 COPY . .
 RUN npx prisma generate && npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 RUN apk add --no-cache openssl libc6-compat
 

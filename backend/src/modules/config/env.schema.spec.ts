@@ -15,7 +15,7 @@ describe('validateEnv', () => {
   });
 
   it('refuses to start without a JWT secret (no insecure fallback)', () => {
-    const { JWT_ACCESS_SECRET, ...rest } = base;
+    const { JWT_ACCESS_SECRET: _omitted, ...rest } = base;
     expect(() => validateEnv(rest)).toThrow(/JWT_ACCESS_SECRET/);
   });
 
@@ -34,6 +34,12 @@ describe('validateEnv', () => {
       expect(() => validateEnv({ ...base, NODE_ENV: 'development', GROQ_API_KEY: key, LLM_MOCK: 'true' })).not.toThrow();
     },
   );
+
+  it('treats empty values as unset (as written in .env.example)', () => {
+    const env = validateEnv({ ...base, MRI_INFERENCE_TOKEN: '', MFA_ENCRYPTION_KEY: '', CORS_ORIGINS: '', TRUST_PROXY: '' });
+    expect(env.MRI_INFERENCE_TOKEN).toBeUndefined();
+    expect(env.MFA_ENCRYPTION_KEY).toBeUndefined();
+  });
 
   it('validates the MFA key length', () => {
     expect(() => validateEnv({ ...base, MFA_ENCRYPTION_KEY: Buffer.alloc(16).toString('base64') })).toThrow(/MFA_ENCRYPTION_KEY/);
