@@ -23,7 +23,7 @@ export function configureApp(app: INestApplication): INestApplication {
 
   const allowedOrigins = new Set(config.corsOrigins);
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Requests without an Origin header (curl, server-to-server, same-origin) are not CORS requests.
       callback(null, !origin || allowedOrigins.has(origin));
     },
