@@ -1,75 +1,106 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+import * as path from 'path';
+import { Env } from './env.schema';
 
+/**
+ * Typed access to configuration that has already been validated by `validateEnv`.
+ * There are deliberately no fallback secrets here: missing values fail at startup.
+ */
 @Injectable()
 export class AppConfigService {
-  constructor(private nestConfigService: NestConfigService) {}
+  constructor(private readonly config: NestConfigService<Env, true>) {}
 
-  get nodeEnv(): string {
-    return this.nestConfigService.get<string>('NODE_ENV', 'development');
+  private get<K extends keyof Env>(key: K): Env[K] {
+    return this.config.get(key, { infer: true });
+  }
+
+  get nodeEnv(): Env['NODE_ENV'] {
+    return this.get('NODE_ENV');
+  }
+
+  get isProduction(): boolean {
+    return this.nodeEnv === 'production';
   }
 
   get port(): number {
-    return this.nestConfigService.get<number>('PORT', 4000);
-  }
-
-  get databaseUrl(): string {
-    return this.nestConfigService.get<string>('DATABASE_URL');
+    return this.get('PORT');
   }
 
   get jwtAccessSecret(): string {
-    return this.nestConfigService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret_key');
-  }
-
-  get jwtRefreshSecret(): string {
-    return this.nestConfigService.get<string>('JWT_REFRESH_SECRET', 'dev_refresh_secret_key');
+    return this.get('JWT_ACCESS_SECRET');
   }
 
   get jwtAccessTtl(): number {
-    return Number(this.nestConfigService.get<number>('JWT_ACCESS_TTL', 900));
+    return this.get('JWT_ACCESS_TTL');
   }
 
-  get jwtRefreshTtl(): number {
-    return Number(this.nestConfigService.get<number>('JWT_REFRESH_TTL', 1209600));
+  get refreshTokenTtl(): number {
+    return this.get('REFRESH_TOKEN_TTL') ?? this.get('JWT_REFRESH_TTL') ?? 1209600;
   }
 
-  get groqApiKey(): string {
-    return this.nestConfigService.get<string>('GROQ_API_KEY', '');
+  get corsOrigins(): string[] {
+    const raw = this.get('CORS_ORIGINS');
+    if (raw) {
+      return raw.split(',').map((o) => o.trim()).filter(Boolean);
+    }
+    return this.isProduction ? [] : ['http://localhost:3000'];
+  }
+
+  get cookieSecure(): boolean {
+    return this.get('COOKIE_SECURE') ?? this.isProduction;
+  }
+
+  get trustProxy(): number {
+    return this.get('TRUST_PROXY') ?? (this.isProduction ? 1 : 0);
+  }
+
+  get llmMock(): boolean {
+    return this.get('LLM_MOCK');
+  }
+
+  get groqApiKey(): string | undefined {
+    return this.get('GROQ_API_KEY');
   }
 
   get groqModelName(): string {
-    return this.nestConfigService.get<string>('GROQ_MODEL_NAME', 'openai/gpt-oss-120b');
+    return this.get('GROQ_MODEL_NAME');
   }
 
   get groqRequestTimeoutMs(): number {
-    return Number(this.nestConfigService.get<number>('GROQ_REQUEST_TIMEOUT_MS', 60000));
+    return this.get('GROQ_REQUEST_TIMEOUT_MS');
   }
 
-  get promptVersion(): string {
-    return this.nestConfigService.get<string>('PROMPT_VERSION', 'v1.4.0');
-  }
-
-  get logLevel(): string {
-    return this.nestConfigService.get<string>('LOG_LEVEL', 'debug');
-  }
-
-  get sentryDsn(): string {
-    return this.nestConfigService.get<string>('SENTRY_DSN', '');
+  get logLevel(): Env['LOG_LEVEL'] {
+    return this.get('LOG_LEVEL');
   }
 
   get mriInferenceServiceUrl(): string {
-    return this.nestConfigService.get<string>('MRI_INFERENCE_SERVICE_URL', 'http://localhost:8000');
+    return this.get('MRI_INFERENCE_SERVICE_URL').replace(/\/$/, '');
+  }
+
+  get mriInferenceToken(): string | undefined {
+    return this.get('MRI_INFERENCE_TOKEN');
+  }
+
+  get mriInferenceTimeoutMs(): number {
+    return this.get('MRI_INFERENCE_TIMEOUT_MS');
   }
 
   get mriMaxUploadSizeMb(): number {
-    return Number(this.nestConfigService.get<number>('MRI_MAX_UPLOAD_SIZE_MB', 20));
+    return this.get('MRI_MAX_UPLOAD_SIZE_MB');
   }
 
-  get mriS3Bucket(): string {
-    return this.nestConfigService.get<string>('MRI_S3_BUCKET', 'cdss-mri-artifacts');
+  get mriMaxFiles(): number {
+    return this.get('MRI_MAX_FILES');
   }
 
-  get modelArtifactsS3Bucket(): string {
-    return this.nestConfigService.get<string>('MODEL_ARTIFACTS_S3_BUCKET', 'cdss-model-artifacts');
+  get artifactStorageDir(): string {
+    return path.resolve(process.cwd(), this.get('ARTIFACT_STORAGE_DIR'));
+  }
+
+  get mfaEncryptionKey(): Buffer | null {
+    const raw = this.get('MFA_ENCRYPTION_KEY');
+    return raw ? Buffer.from(raw, 'base64') : null;
   }
 }

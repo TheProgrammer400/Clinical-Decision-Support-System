@@ -8,17 +8,22 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "sh ./scripts/migrate.sh",
     "prisma:seed": "ts-node src/database/seed.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "eval:llm": "ts-node eval/run-eval.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -27,12 +32,17 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/throttler": "^6.7.1",
     "@prisma/client": "^5.10.0",
+    "argon2": "^0.45.1",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
-    "groq-sdk": "^0.3.3",
+    "groq-sdk": "^1.6.0",
+    "helmet": "^8.3.0",
+    "otplib": "^13.5.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.1",
@@ -44,6 +54,7 @@
     "@nestjs/schematics": "^10.1.0",
     "@nestjs/testing": "^10.3.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.0",
@@ -62,18 +73,46 @@
   "jest": {
     "moduleFileExtensions": [
       "js",
+      "mjs",
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "test/tsconfig.json"
+        }
+      ],
+      "^.+\\.m?js$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "allowJs": true,
+            "module": "commonjs",
+            "target": "ES2022"
+          }
+        }
+      ]
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.ts",
+      "!src/main.ts",
+      "!src/database/seed.ts"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src",
+      "<rootDir>/eval"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(@scure|@noble|@otplib|otplib)/)"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

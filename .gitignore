@@ -47,14 +47,9 @@ htmlcov/
 mri-inference-service/models/*.pth
 !mri-inference-service/models/.gitkeep
 
-# Local Uploads & Storage Artifacts
+# Local Uploads & Storage Artifacts (patient data must never be committed)
 uploads/
 backend/uploads/
-*.png
-*.jpg
-*.jpeg
-*.webp
-!frontend/public/**/*
 
 # Backend Build & Test Outputs
 backend/dist/
@@ -62,6 +57,7 @@ backend/coverage/
 backend/.nest/
 
 # Next.js Frontend Build & Cache
+*.tsbuildinfo
 frontend/.next/
 frontend/out/
 frontend/build/
@@ -80,7 +76,6 @@ infrastructure/terraform/.terraform/
 !example.tfvars
 override.tf
 override.tf.json
-.terraform.lock.hcl
 
 # Operating System & IDE Files
 .DS_Store
@@ -101,8 +96,6 @@ tmp/
 temp/
 scratch/
 
-*.md
-!README.md
 
 # Allow AWS Infrastructure & GitHub CI/CD workflows
 # .github/ and infrastructure/ are tracked for deployment
@@ -110,6 +103,3 @@ scratch/
 
 # unneccessary files
 additional/
-
-# executable files
-*.sh
