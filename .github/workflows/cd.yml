@@ -32,7 +32,7 @@ jobs:
           echo "$JWT" | python3 .github/scripts/decode_oidc.py
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ap-south-1
           role-to-assume: arn:aws:iam::061179368899:role/CDSSGitHubDeployRole
