@@ -103,3 +103,6 @@ scratch/
 
 # unneccessary files
 additional/
+
+# executable files
+*.sh
